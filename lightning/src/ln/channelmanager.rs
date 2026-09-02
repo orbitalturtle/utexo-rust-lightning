@@ -5517,6 +5517,8 @@ where
 							&self.fee_estimator,
 							&&logger,
 							htlc_rgb_payment,
+							// TODO(rgb-carrier): wire up once route/onion carrier plumbing lands.
+							None,
 						);
 						match break_channel_entry!(self, peer_state, send_res, chan_entry) {
 							Some(monitor_update) => {
@@ -7808,6 +7810,9 @@ where
 						&self.fee_estimator,
 						&&logger,
 						*outgoing_rgb_payment,
+						// TODO(rgb-carrier): forward the incoming HTLC's carrier once
+						// `PendingHTLCInfo` gains an `outgoing_carrier_msat` field.
+						None,
 					) {
 						log_trace!(
 							logger,

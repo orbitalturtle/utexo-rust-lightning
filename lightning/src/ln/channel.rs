@@ -336,6 +336,7 @@ struct InboundHTLCOutput {
 	payment_hash: PaymentHash,
 	state: InboundHTLCState,
 	rgb_payment: Option<(ContractId, u64)>,
+	carrier_msat: Option<u64>,
 }
 
 #[cfg_attr(test, derive(Clone, Debug, PartialEq))]
@@ -463,6 +464,7 @@ struct OutboundHTLCOutput {
 	send_timestamp: Option<Duration>,
 	hold_htlc: Option<()>,
 	rgb_payment: Option<(ContractId, u64)>,
+	carrier_msat: Option<u64>,
 }
 
 /// See AwaitingRemoteRevoke ChannelState for more info
@@ -481,6 +483,7 @@ enum HTLCUpdateAwaitingACK {
 		blinding_point: Option<PublicKey>,
 		hold_htlc: Option<()>,
 		rgb_payment: Option<(ContractId, u64)>,
+		carrier_msat: Option<u64>,
 	},
 	ClaimHTLC {
 		payment_preimage: PaymentPreimage,
@@ -5525,7 +5528,8 @@ where
 					cltv_expiry: $htlc.cltv_expiry,
 					payment_hash: $htlc.payment_hash,
 					transaction_output_index: None,
-					rgb_payment: $htlc.rgb_payment
+					rgb_payment: $htlc.rgb_payment,
+					carrier_msat: $htlc.carrier_msat,
 				}
 			}
 		}
@@ -8010,6 +8014,7 @@ where
 				update_add_htlc: msg.clone(),
 			}),
 			rgb_payment: msg.rgb_payment,
+			carrier_msat: msg.carrier_msat,
 		});
 		Ok(())
 	}
@@ -8636,6 +8641,7 @@ where
 						blinding_point,
 						hold_htlc,
 						rgb_payment,
+						carrier_msat,
 						..
 					} => {
 						match self.send_htlc(
@@ -8651,6 +8657,7 @@ where
 							fee_estimator,
 							logger,
 							rgb_payment,
+							carrier_msat,
 						) {
 							Ok(can_add_htlc) => {
 								// `send_htlc` only returns `Ok(false)`, when an update goes into
@@ -9985,6 +9992,7 @@ where
 					blinding_point: htlc.blinding_point,
 					hold_htlc: htlc.hold_htlc,
 					rgb_payment: htlc.rgb_payment,
+					carrier_msat: htlc.carrier_msat,
 				});
 			}
 		}
@@ -12823,7 +12831,7 @@ where
 		&mut self, amount_msat: u64, payment_hash: PaymentHash, cltv_expiry: u32,
 		source: HTLCSource, onion_routing_packet: msgs::OnionPacket, skimmed_fee_msat: Option<u64>,
 		blinding_point: Option<PublicKey>, fee_estimator: &LowerBoundedFeeEstimator<F>, logger: &L,
-		rgb_payment: Option<(ContractId, u64)>,
+		rgb_payment: Option<(ContractId, u64)>, carrier_msat: Option<u64>,
 	) -> Result<(), (LocalHTLCFailureReason, String)>
 	where
 		F::Target: FeeEstimator,
@@ -12843,6 +12851,7 @@ where
 			fee_estimator,
 			logger,
 			rgb_payment,
+			carrier_msat,
 		)
 		.map(|can_add_htlc| assert!(!can_add_htlc, "We forced holding cell?"))
 		.map_err(|err| {
@@ -12873,7 +12882,7 @@ where
 		source: HTLCSource, onion_routing_packet: msgs::OnionPacket, mut force_holding_cell: bool,
 		skimmed_fee_msat: Option<u64>, blinding_point: Option<PublicKey>, hold_htlc: bool,
 		fee_estimator: &LowerBoundedFeeEstimator<F>, logger: &L,
-		rgb_payment: Option<(ContractId, u64)>,
+		rgb_payment: Option<(ContractId, u64)>, carrier_msat: Option<u64>,
 	) -> Result<bool, (LocalHTLCFailureReason, String)>
 	where
 		F::Target: FeeEstimator,
@@ -12969,6 +12978,7 @@ where
 				blinding_point,
 				hold_htlc: hold_htlc.then(|| ()),
 				rgb_payment,
+				carrier_msat,
 			});
 			return Ok(false);
 		}
@@ -12992,6 +13002,7 @@ where
 			send_timestamp,
 			hold_htlc: hold_htlc.then(|| ()),
 			rgb_payment,
+			carrier_msat,
 		});
 		self.context.next_holder_htlc_id += 1;
 
@@ -13233,7 +13244,7 @@ where
 		&mut self, amount_msat: u64, payment_hash: PaymentHash, cltv_expiry: u32,
 		source: HTLCSource, onion_routing_packet: msgs::OnionPacket, skimmed_fee_msat: Option<u64>,
 		hold_htlc: bool, fee_estimator: &LowerBoundedFeeEstimator<F>, logger: &L,
-		rgb_payment: Option<(ContractId, u64)>,
+		rgb_payment: Option<(ContractId, u64)>, carrier_msat: Option<u64>,
 	) -> Result<Option<ChannelMonitorUpdate>, ChannelError>
 	where
 		F::Target: FeeEstimator,
@@ -13252,6 +13263,7 @@ where
 			fee_estimator,
 			logger,
 			rgb_payment,
+			carrier_msat,
 		);
 		// All [`LocalHTLCFailureReason`] errors are temporary, so they are [`ChannelError::Ignore`].
 		let can_add_htlc = send_res.map_err(|(_, msg)| ChannelError::Ignore(msg))?;
@@ -14899,6 +14911,7 @@ where
 				},
 			}
 			htlc.rgb_payment.write(writer)?;
+			htlc.carrier_msat.write(writer)?;
 		}
 
 		// The elements of this vector will always be `Some` starting in 0.2,
@@ -14949,6 +14962,7 @@ where
 				},
 			}
 			htlc.rgb_payment.write(writer)?;
+			htlc.carrier_msat.write(writer)?;
 			pending_outbound_skimmed_fees.push(htlc.skimmed_fee_msat);
 			pending_outbound_blinding_points.push(htlc.blinding_point);
 			pending_outbound_held_htlc_flags.push(htlc.hold_htlc);
@@ -14978,6 +14992,7 @@ where
 					skimmed_fee_msat,
 					hold_htlc,
 					rgb_payment,
+					carrier_msat,
 				} => {
 					0u8.write(writer)?;
 					amount_msat.write(writer)?;
@@ -14991,6 +15006,7 @@ where
 					holding_cell_held_htlc_flags.push(hold_htlc);
 
 					rgb_payment.write(writer)?;
+					carrier_msat.write(writer)?;
 				},
 				&HTLCUpdateAwaitingACK::ClaimHTLC {
 					ref payment_preimage,
@@ -15361,6 +15377,7 @@ where
 					_ => return Err(DecodeError::InvalidValue),
 				},
 				rgb_payment: Readable::read(reader)?,
+				carrier_msat: Readable::read(reader)?,
 			});
 		}
 
@@ -15413,6 +15430,7 @@ where
 				send_timestamp: None,
 				hold_htlc: None,
 				rgb_payment: Readable::read(reader)?,
+				carrier_msat: Readable::read(reader)?,
 			});
 		}
 
@@ -15433,6 +15451,7 @@ where
 					blinding_point: None,
 					hold_htlc: None,
 					rgb_payment: Readable::read(reader)?,
+					carrier_msat: Readable::read(reader)?,
 				},
 				1 => HTLCUpdateAwaitingACK::ClaimHTLC {
 					payment_preimage: Readable::read(reader)?,

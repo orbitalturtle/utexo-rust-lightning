@@ -1598,6 +1598,7 @@ pub(crate) fn write_chanmon_internal<Signer: EcdsaChannelSigner, W: Writer>(
 			writer.write_all(&$htlc_output.payment_hash.0[..])?;
 			$htlc_output.transaction_output_index.write(writer)?;
             $htlc_output.rgb_payment.write(writer)?;
+            $htlc_output.carrier_msat.write(writer)?;
 		}
 	}
 
@@ -6513,9 +6514,10 @@ impl<'a, 'b, ES: EntropySource, SP: SignerProvider> ReadableArgs<(&'a ES, &'b SP
 					let payment_hash: PaymentHash = Readable::read(reader)?;
 					let transaction_output_index: Option<u32> = Readable::read(reader)?;
                     let rgb_payment: Option<(ContractId, u64)> = Readable::read(reader)?;
+                    let carrier_msat: Option<u64> = Readable::read(reader)?;
 
 					HTLCOutputInCommitment {
-						offered, amount_msat, cltv_expiry, payment_hash, transaction_output_index, rgb_payment
+						offered, amount_msat, cltv_expiry, payment_hash, transaction_output_index, rgb_payment, carrier_msat
 					}
 				}
 			}

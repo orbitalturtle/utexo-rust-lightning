@@ -780,6 +780,10 @@ pub struct UpdateAddHTLC {
 	pub hold_htlc: Option<()>,
 	/// The RGB payment allocated to the HTLC
 	pub rgb_payment: Option<(ContractId, u64)>,
+	/// The refundable BTC carrier amount included in `amount_msat`, present only for
+	/// `rgb_asset_only` HTLCs. Excluded from off-chain settlement accounting once the HTLC's
+	/// fulfillment becomes irrevocable; on-chain paths always use the full `amount_msat`.
+	pub carrier_msat: Option<u64>,
 }
 
 /// An [`onion message`] to be sent to or received from a peer.
@@ -3400,6 +3404,7 @@ impl_writeable_msg!(UpdateAddHTLC, {
 	rgb_payment
 }, {
 	(0, blinding_point, option),
+	(3, carrier_msat, option),
 	(65537, skimmed_fee_msat, option),
 	// TODO: currently we may fail to read the `ChannelManager` if we write a new even TLV in this message
 	// and then downgrade. Once this is fixed, update the type here to match BOLTs PR 989.

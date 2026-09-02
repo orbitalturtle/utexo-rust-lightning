@@ -731,6 +731,10 @@ pub struct HTLCOutputInCommitment {
 	pub transaction_output_index: Option<u32>,
 	/// The RGB payment allocated to the HTLC
 	pub rgb_payment: Option<(ContractId, u64)>,
+	/// The refundable BTC carrier amount included in `amount_msat`, present only for
+	/// `rgb_asset_only` HTLCs. On-chain claim/sweep transactions always use the full
+	/// `amount_msat` — the carrier only affects off-chain settlement accounting.
+	pub carrier_msat: Option<u64>,
 }
 
 impl HTLCOutputInCommitment {
@@ -758,6 +762,7 @@ impl_writeable_tlv_based!(HTLCOutputInCommitment, {
 	(6, payment_hash, required),
 	(8, transaction_output_index, option),
 	(10, rgb_payment, option),
+	(12, carrier_msat, option),
 });
 
 #[inline]
