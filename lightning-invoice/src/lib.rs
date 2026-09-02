@@ -539,6 +539,10 @@ pub enum TaggedField {
 	Features(Bolt11InvoiceFeatures),
 	RgbAmount(RgbAmount),
 	RgbContractId(RgbContractId),
+	/// Opts the invoice into `rgb_asset_only` mode. Carries no data — the tag's mere presence
+	/// in the invoice is the signal; it must never be inferred from an amountless invoice, and
+	/// is only ever set explicitly via [`InvoiceBuilder::rgb_asset_only`].
+	RgbAssetOnly,
 }
 
 /// SHA-256 hash
@@ -634,6 +638,7 @@ pub mod constants {
 	pub const TAG_FEATURES: u8 = 5;
 	pub const TAG_RGB_AMOUNT: u8 = 30;
 	pub const TAG_RGB_CONTRACT_ID: u8 = 31;
+	pub const TAG_RGB_ASSET_ONLY: u8 = 29;
 }
 
 impl InvoiceBuilder<tb::False, tb::False, tb::False, tb::False, tb::False, tb::False> {
@@ -747,6 +752,16 @@ impl<D: tb::Bool, H: tb::Bool, T: tb::Bool, C: tb::Bool, S: tb::Bool, M: tb::Boo
 		self.tagged_fields.push(TaggedField::RgbContractId(RgbContractId(rgb_contract_id)));
 		self
 	}
+
+	/// Opts the invoice into `rgb_asset_only` mode: the invoice carries no bitcoin amount, and a
+	/// payer must route it with a refundable BTC carrier HTLC instead. Must be combined with
+	/// [`Self::rgb_contract_id`] and [`Self::rgb_amount`], and must not be combined with
+	/// [`Self::amount_milli_satoshis`] — [`Self::build_raw`] enforces both, since asset-only mode
+	/// must always be explicit and never inferred from an amountless invoice.
+	pub fn rgb_asset_only(mut self) -> Self {
+		self.tagged_fields.push(TaggedField::RgbAssetOnly);
+		self
+	}
 }
 
 impl<D: tb::Bool, H: tb::Bool, C: tb::Bool, S: tb::Bool, M: tb::Bool>
@@ -758,6 +773,20 @@ impl<D: tb::Bool, H: tb::Bool, C: tb::Bool, S: tb::Bool, M: tb::Bool>
 		// If an error occurred at any time before, return it now
 		if let Some(e) = self.error {
 			return Err(e);
+		}
+
+		let is_rgb_asset_only =
+			self.tagged_fields.iter().any(|tf| matches!(tf, TaggedField::RgbAssetOnly));
+		if is_rgb_asset_only {
+			let has_rgb_contract_id = self
+				.tagged_fields
+				.iter()
+				.any(|tf| matches!(tf, TaggedField::RgbContractId(_)));
+			let has_rgb_amount =
+				self.tagged_fields.iter().any(|tf| matches!(tf, TaggedField::RgbAmount(_)));
+			if self.amount.is_some() || !has_rgb_contract_id || !has_rgb_amount {
+				return Err(CreationError::InvalidRgbAssetOnlyInvoice);
+			}
 		}
 
 		let hrp =
@@ -1231,6 +1260,10 @@ impl RawBolt11Invoice {
 		find_extract!(self.known_tagged_fields(), TaggedField::RgbContractId(ref x), x)
 	}
 
+	pub fn rgb_asset_only(&self) -> bool {
+		self.known_tagged_fields().any(|tf| matches!(tf, TaggedField::RgbAssetOnly))
+	}
+
 	/// This is not exported to bindings users as we don't support Vec<&NonOpaqueType>
 	pub fn fallbacks(&self) -> Vec<&Fallback> {
 		find_all_extract!(self.known_tagged_fields(), TaggedField::Fallback(ref x), x).collect()
@@ -1684,6 +1717,12 @@ impl Bolt11Invoice {
 	pub fn rgb_contract_id(&self) -> Option<ContractId> {
 		self.signed_invoice.rgb_contract_id().map(|x| x.0)
 	}
+
+	/// Returns whether this invoice opted into `rgb_asset_only` mode. Never inferred from an
+	/// amountless invoice — only true if the `rgb_asset_only` tag was explicitly set.
+	pub fn rgb_asset_only(&self) -> bool {
+		self.signed_invoice.rgb_asset_only()
+	}
 }
 
 impl From<TaggedField> for RawTaggedField {
@@ -1709,6 +1748,7 @@ impl TaggedField {
 			TaggedField::Features(_) => constants::TAG_FEATURES,
 			TaggedField::RgbAmount(_) => constants::TAG_RGB_AMOUNT,
 			TaggedField::RgbContractId(_) => constants::TAG_RGB_CONTRACT_ID,
+			TaggedField::RgbAssetOnly => constants::TAG_RGB_ASSET_ONLY,
 		};
 
 		Fe32::try_from(tag).expect("all tags defined are <32")
@@ -1854,6 +1894,11 @@ pub enum CreationError {
 
 	/// The provided `min_final_cltv_expiry_delta` was less than rust-lightning's minimum.
 	MinFinalCltvExpiryDeltaTooShort,
+
+	/// `rgb_asset_only` was set without both `rgb_contract_id` and `rgb_amount`, or was combined
+	/// with a bitcoin amount. Asset-only mode must never be inferred from an amountless invoice,
+	/// so all three conditions are required together.
+	InvalidRgbAssetOnlyInvoice,
 }
 
 impl Display for CreationError {
@@ -1866,6 +1911,8 @@ impl Display for CreationError {
 			CreationError::MissingRouteHints => f.write_str("The invoice required route hints and they weren't provided"),
 			CreationError::MinFinalCltvExpiryDeltaTooShort => f.write_str(
 				"The supplied final CLTV expiry delta was less than LDK's `MIN_FINAL_CLTV_EXPIRY_DELTA`"),
+			CreationError::InvalidRgbAssetOnlyInvoice => f.write_str(
+				"rgb_asset_only requires rgb_contract_id and rgb_amount and must not have a bitcoin amount"),
 		}
 	}
 }
@@ -2451,6 +2498,87 @@ mod test {
 		let invoice = Bolt11Invoice::from_signed(signed_invoice).unwrap();
 
 		assert!(invoice.would_expire(Duration::from_secs(1234567 + DEFAULT_EXPIRY_TIME + 1)));
+	}
+
+	#[test]
+	fn test_rgb_asset_only() {
+		use crate::*;
+		use bitcoin::secp256k1::Secp256k1;
+		use bitcoin::secp256k1::SecretKey;
+		use rgb_lib::ContractId;
+
+		let contract_id = ContractId::copy_from_slice([7u8; 32]).unwrap();
+		let sign = |hash: &_| {
+			let privkey = SecretKey::from_slice(&[41; 32]).unwrap();
+			let secp_ctx = Secp256k1::new();
+			Ok(secp_ctx.sign_ecdsa_recoverable(hash, &privkey))
+		};
+
+		// A well-formed asset-only invoice round-trips and reports `rgb_asset_only() == true`,
+		// with no bitcoin amount.
+		let signed_invoice = InvoiceBuilder::new(Currency::Bitcoin)
+			.description("Test".into())
+			.payment_hash(sha256::Hash::from_slice(&[0; 32][..]).unwrap())
+			.payment_secret(PaymentSecret([0; 32]))
+			.duration_since_epoch(Duration::from_secs(1234567))
+			.rgb_contract_id(contract_id)
+			.rgb_amount(42)
+			.rgb_asset_only()
+			.build_raw()
+			.unwrap()
+			.sign::<_, ()>(sign)
+			.unwrap();
+		let invoice = Bolt11Invoice::from_signed(signed_invoice).unwrap();
+		assert!(invoice.rgb_asset_only());
+		assert_eq!(invoice.rgb_contract_id(), Some(contract_id));
+		assert_eq!(invoice.rgb_amount(), Some(42));
+		assert_eq!(invoice.amount_milli_satoshis(), None);
+
+		let reparsed = Bolt11Invoice::from_str(&invoice.to_string()).unwrap();
+		assert!(reparsed.rgb_asset_only());
+		assert_eq!(reparsed.rgb_contract_id(), Some(contract_id));
+		assert_eq!(reparsed.rgb_amount(), Some(42));
+
+		// A normal invoice (even one carrying rgb_contract_id/rgb_amount) never reports
+		// asset-only unless the tag was explicitly set.
+		let signed_invoice = InvoiceBuilder::new(Currency::Bitcoin)
+			.description("Test".into())
+			.payment_hash(sha256::Hash::from_slice(&[0; 32][..]).unwrap())
+			.payment_secret(PaymentSecret([0; 32]))
+			.duration_since_epoch(Duration::from_secs(1234567))
+			.rgb_contract_id(contract_id)
+			.rgb_amount(42)
+			.build_raw()
+			.unwrap()
+			.sign::<_, ()>(sign)
+			.unwrap();
+		let invoice = Bolt11Invoice::from_signed(signed_invoice).unwrap();
+		assert!(!invoice.rgb_asset_only());
+
+		// asset-only requires both rgb_contract_id and rgb_amount.
+		let err = InvoiceBuilder::new(Currency::Bitcoin)
+			.description("Test".into())
+			.payment_hash(sha256::Hash::from_slice(&[0; 32][..]).unwrap())
+			.payment_secret(PaymentSecret([0; 32]))
+			.duration_since_epoch(Duration::from_secs(1234567))
+			.rgb_asset_only()
+			.build_raw()
+			.unwrap_err();
+		assert_eq!(err, CreationError::InvalidRgbAssetOnlyInvoice);
+
+		// asset-only must not be combined with a bitcoin amount.
+		let err = InvoiceBuilder::new(Currency::Bitcoin)
+			.description("Test".into())
+			.payment_hash(sha256::Hash::from_slice(&[0; 32][..]).unwrap())
+			.payment_secret(PaymentSecret([0; 32]))
+			.duration_since_epoch(Duration::from_secs(1234567))
+			.amount_milli_satoshis(1000)
+			.rgb_contract_id(contract_id)
+			.rgb_amount(42)
+			.rgb_asset_only()
+			.build_raw()
+			.unwrap_err();
+		assert_eq!(err, CreationError::InvalidRgbAssetOnlyInvoice);
 	}
 
 	#[cfg(feature = "serde")]

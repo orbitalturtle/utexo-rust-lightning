@@ -581,6 +581,10 @@ impl FromBase32 for TaggedField {
 			constants::TAG_RGB_CONTRACT_ID => {
 				Ok(TaggedField::RgbContractId(RgbContractId::from_base32(field_data)?))
 			},
+			constants::TAG_RGB_ASSET_ONLY => {
+				<()>::from_base32(field_data)?;
+				Ok(TaggedField::RgbAssetOnly)
+			},
 			_ => {
 				// "A reader MUST skip over unknown fields"
 				Err(Bolt11ParseError::Skip)
@@ -765,6 +769,20 @@ impl FromBase32 for RgbContractId {
 				Ok(cid) => Ok(RgbContractId(cid)),
 				Err(_) => Err(Bolt11ParseError::InvalidContractId),
 			}
+		}
+	}
+}
+
+impl FromBase32 for () {
+	type Err = Bolt11ParseError;
+
+	fn from_base32(field_data: &[Fe32]) -> Result<(), Bolt11ParseError> {
+		if field_data.is_empty() {
+			Ok(())
+		} else {
+			// A presence-only field must carry no data; a non-empty payload here is not a value
+			// we know how to interpret, so treat it like any other unknown/malformed field.
+			Err(Bolt11ParseError::Skip)
 		}
 	}
 }

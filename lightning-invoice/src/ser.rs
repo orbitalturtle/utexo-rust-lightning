@@ -416,6 +416,18 @@ impl Base32Len for RgbContractId {
 	}
 }
 
+impl Base32Iterable for () {
+	fn fe_iter<'s>(&'s self) -> Box<dyn Iterator<Item = Fe32> + 's> {
+		Box::new(iter::empty())
+	}
+}
+
+impl Base32Len for () {
+	fn base32_len(&self) -> usize {
+		0
+	}
+}
+
 // Shorthand type
 type TaggedFieldIter<I> = core::iter::Chain<core::array::IntoIter<Fe32, 3>, I>;
 
@@ -482,6 +494,7 @@ impl Base32Iterable for TaggedField {
 			TaggedField::RgbContractId(ref rgb_contract_id) => {
 				write_tagged_field(constants::TAG_RGB_CONTRACT_ID, rgb_contract_id)
 			},
+			TaggedField::RgbAssetOnly => write_tagged_field(constants::TAG_RGB_ASSET_ONLY, &()),
 		})
 	}
 }

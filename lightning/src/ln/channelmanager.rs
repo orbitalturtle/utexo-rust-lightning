@@ -12917,7 +12917,7 @@ This indicates a bug inside LDK. Please report this error at https://github.com/
 	) -> Result<Bolt11Invoice, SignOrCreationError<()>> {
 		let Bolt11InvoiceParameters {
 			amount_msats, description, invoice_expiry_delta_secs, min_final_cltv_expiry_delta,
-			payment_hash, contract_id, asset_amount,
+			payment_hash, contract_id, asset_amount, rgb_asset_only,
 		} = params;
 
 		let currency =
@@ -12997,6 +12997,9 @@ This indicates a bug inside LDK. Please report this error at https://github.com/
 		if let Some(amt) = asset_amount {
 			invoice = invoice.rgb_amount(amt);
 		}
+		if rgb_asset_only {
+			invoice = invoice.rgb_asset_only();
+		}
 
 		let channels = self.list_channels();
 		let route_hints = super::invoice_utils::sort_and_filter_channels(channels, amount_msats, &self.logger);
@@ -13052,6 +13055,13 @@ pub struct Bolt11InvoiceParameters {
 
 	/// The RGB asset amount specified in the invoice.
 	pub asset_amount: Option<u64>,
+
+	/// Opts the invoice into `rgb_asset_only` mode: the invoice carries no bitcoin amount, and
+	/// payers must route it with a refundable BTC carrier HTLC instead. Must be combined with
+	/// `contract_id` and `asset_amount`, and must not be combined with `amount_msats` —
+	/// [`Bolt11InvoiceBuilder::build_raw`] enforces both. Never inferred from an amountless
+	/// invoice; only ever set explicitly.
+	pub rgb_asset_only: bool,
 }
 
 impl Default for Bolt11InvoiceParameters {
@@ -13064,6 +13074,7 @@ impl Default for Bolt11InvoiceParameters {
 			payment_hash: None,
 			contract_id: None,
 			asset_amount: None,
+			rgb_asset_only: false,
 		}
 	}
 }
