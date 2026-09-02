@@ -83,6 +83,9 @@
 //!   (see [BOLT PR #1160](https://github.com/lightning/bolts/pull/1160) for more information).
 //! - `HtlcHold` - requires/supports holding HTLCs and forwarding on receipt of an onion message
 //!   (see [BOLT-2](https://github.com/lightning/bolts/pull/989/files) for more information).
+//! - `RgbAssetOnlyCarrier` - requires/supports RGB asset-only payments using a refundable BTC
+//!   carrier HTLC amount that is excluded from off-chain settlement accounting on success (RGB
+//!   fork-specific, not yet a BOLT proposal).
 //!
 //! LDK knows about the following features, but does not support them:
 //! - `AnchorsNonzeroFeeHtlcTx` - the initial version of anchor outputs, which was later found to be
@@ -174,7 +177,7 @@ mod sealed {
 			// Byte 18
 			,
 			// Byte 19
-			HtlcHold,
+			HtlcHold | RgbAssetOnlyCarrier,
 		]
 	);
 	define_context!(
@@ -203,7 +206,7 @@ mod sealed {
 			// Byte 18
 			,
 			// Byte 19
-			HtlcHold,
+			HtlcHold | RgbAssetOnlyCarrier,
 			// Byte 20 - 31
 			,,,,,,,,,,,,
 			// Byte 32
@@ -228,6 +231,10 @@ mod sealed {
 		PaymentMetadata,
 		// Byte 7
 		Trampoline,
+		// Byte 8 - 18
+		,,,,,,,,,,,
+		// Byte 19
+		RgbAssetOnlyCarrier,
 	]);
 	define_context!(OfferContext, []);
 	define_context!(InvoiceRequestContext, []);
@@ -271,6 +278,10 @@ mod sealed {
 		,,,,,,,,,,
 		// Byte 17
 		AnchorZeroFeeCommitmentsStaging,
+		// Byte 18
+		,
+		// Byte 19
+		RgbAssetOnlyCarrier,
 	]);
 
 	/// Defines a feature with the given bits for the specified [`Context`]s. The generated trait is
@@ -720,6 +731,17 @@ mod sealed {
 		clear_htlc_hold,
 		supports_htlc_hold,
 		requires_htlc_hold
+	);
+	define_feature!(
+		155, // RGB fork-specific; no BOLT slot exists, chosen adjacent to HtlcHold's experimental bit
+		RgbAssetOnlyCarrier,
+		[InitContext, NodeContext, ChannelTypeContext, Bolt11InvoiceContext],
+		"Feature flags for RGB asset-only payments via a refundable BTC carrier HTLC amount.",
+		set_rgb_asset_only_carrier_optional,
+		set_rgb_asset_only_carrier_required,
+		clear_rgb_asset_only_carrier,
+		supports_rgb_asset_only_carrier,
+		requires_rgb_asset_only_carrier
 	);
 	define_feature!(
 		63, // Actually the SpliceProduction feature
