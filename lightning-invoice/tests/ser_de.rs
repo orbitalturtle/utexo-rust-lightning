@@ -138,7 +138,7 @@ fn get_test_tuples() -> Vec<(String, SignedRawBolt11Invoice, bool, bool)> {
 					short_channel_id: (66051 << 40) | (263430 << 16) | 1800,
 					fees: RoutingFees { base_msat: 1, proportional_millionths: 20 },
 					cltv_expiry_delta: 3,
-					htlc_maximum_msat: None, htlc_minimum_msat: None,
+					htlc_maximum_msat: None, htlc_maximum_rgb: None, htlc_minimum_msat: None,
 				}, RouteHintHop {
 					src_node_id: PublicKey::from_slice(&<Vec<u8>>::from_hex(
 							"039e03a901b85534ff1e92c43c74431f7ce72046060fcf7a95c37e148f78c77255"
@@ -146,7 +146,7 @@ fn get_test_tuples() -> Vec<(String, SignedRawBolt11Invoice, bool, bool)> {
 					short_channel_id: (197637 << 40) | (395016 << 16) | 2314,
 					fees: RoutingFees { base_msat: 2, proportional_millionths: 30 },
 					cltv_expiry_delta: 4,
-					htlc_maximum_msat: None, htlc_minimum_msat: None,
+					htlc_maximum_msat: None, htlc_maximum_rgb: None, htlc_minimum_msat: None,
 				}]))
 				.build_raw()
 				.unwrap()
@@ -248,7 +248,7 @@ fn get_test_tuples() -> Vec<(String, SignedRawBolt11Invoice, bool, bool)> {
 					short_channel_id: (589390 << 40) | (3312 << 16) | 1,
 					fees: RoutingFees { base_msat: 1000, proportional_millionths: 2500 },
 					cltv_expiry_delta: 40,
-					htlc_maximum_msat: None, htlc_minimum_msat: None,
+					htlc_maximum_msat: None, htlc_maximum_rgb: None, htlc_minimum_msat: None,
 				}]))
 				.build_raw()
 				.unwrap()

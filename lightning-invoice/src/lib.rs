@@ -2264,6 +2264,7 @@ mod test {
 			cltv_expiry_delta: 0,
 			htlc_minimum_msat: None,
 			htlc_maximum_msat: None,
+			htlc_maximum_rgb: None,
 		};
 		let too_long_route = RouteHint(vec![route_hop; 13]);
 		let long_route_res =
@@ -2305,6 +2306,7 @@ mod test {
 				cltv_expiry_delta: 145,
 				htlc_minimum_msat: None,
 				htlc_maximum_msat: None,
+			htlc_maximum_rgb: None,
 			},
 			RouteHintHop {
 				src_node_id: public_key,
@@ -2313,6 +2315,7 @@ mod test {
 				cltv_expiry_delta: 146,
 				htlc_minimum_msat: None,
 				htlc_maximum_msat: None,
+			htlc_maximum_rgb: None,
 			},
 		]);
 
@@ -2324,6 +2327,7 @@ mod test {
 				cltv_expiry_delta: 147,
 				htlc_minimum_msat: None,
 				htlc_maximum_msat: None,
+			htlc_maximum_rgb: None,
 			},
 			RouteHintHop {
 				src_node_id: public_key,
@@ -2332,6 +2336,7 @@ mod test {
 				cltv_expiry_delta: 148,
 				htlc_minimum_msat: None,
 				htlc_maximum_msat: None,
+			htlc_maximum_rgb: None,
 			},
 		]);
 
