@@ -5084,10 +5084,14 @@ fn test_mpp_claim_to_holding_cell() {
 	route.paths[0].hops[0].short_channel_id = chan_1_scid;
 	route.paths[0].hops[1].short_channel_id = chan_3_scid;
 	route.paths[0].hops[1].fee_msat = 250_000;
+	route.paths[0].hops[0].payment_amount = 250_000;
+	route.paths[0].hops[1].payment_amount = 250_000;
 	route.paths[1].hops[0].pubkey = node_c_id;
 	route.paths[1].hops[0].short_channel_id = chan_2_scid;
 	route.paths[1].hops[1].short_channel_id = chan_4_scid;
 	route.paths[1].hops[1].fee_msat = 250_000;
+	route.paths[1].hops[0].payment_amount = 250_000;
+	route.paths[1].hops[1].payment_amount = 250_000;
 	let paths = &[&[&nodes[1], &nodes[3]][..], &[&nodes[2], &nodes[3]][..]];
 	send_along_route_with_secret(&nodes[0], route, paths, 500_000, paymnt_hash_1, payment_secret);
 
