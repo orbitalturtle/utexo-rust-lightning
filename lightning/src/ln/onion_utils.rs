@@ -573,7 +573,14 @@ where
 		// First hop gets special values so that it can check, on receipt, that everything is
 		// exactly as it should be (and the next hop isn't trying to probe to find out if we're
 		// the intended recipient).
-		let (value_msat, rgb_payment) = if last_msat_amount == 0 {
+		//
+		// When a blinded tail is present, `hop` (the last unblinded hop, i.e. the blinded path's
+		// introduction node) doesn't receive the final value directly -- its `fee_msat` instead
+		// holds the fee for traversing the entire blinded path (see `RouteHop::fee_msat`'s doc).
+		// That needs to be folded into `cur_accumulated_fees` just like any other hop's fee, so
+		// that upstream hops forward enough to cover it; the actual value the introduction node
+		// itself should see is taken from `blinded_tail`'s `final_value_msat` below instead.
+		let (value_msat, rgb_payment) = if last_msat_amount == 0 && blinded_tail.is_none() {
 			(hop.fee_msat(), hop.rgb_payment())
 		} else {
 			cur_accumulated_fees += hop.fee_msat();
