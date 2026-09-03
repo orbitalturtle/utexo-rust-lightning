@@ -1900,7 +1900,7 @@ fn test_trampoline_onion_payload_assembly_values() {
 	let path = Path {
 		hops: vec![
 			// Bob
-			RouteHop { payment_amount: 0, rgb_payment: None,
+			RouteHop { payment_amount: amt_msat, rgb_payment: None,
 				pubkey: PublicKey::from_slice(&<Vec<u8>>::from_hex(BOB_HEX).unwrap()).unwrap(),
 				node_features: NodeFeatures::empty(),
 				short_channel_id: 0,
@@ -1910,7 +1910,7 @@ fn test_trampoline_onion_payload_assembly_values() {
 				maybe_announced_channel: false,
 			},
 			// Carol
-			RouteHop { payment_amount: 0, rgb_payment: None,
+			RouteHop { payment_amount: amt_msat, rgb_payment: None,
 				pubkey: PublicKey::from_slice(&<Vec<u8>>::from_hex(CAROL_HEX).unwrap()).unwrap(),
 				node_features: NodeFeatures::empty(),
 				short_channel_id: (572330 << 40) + (42 << 16) + 2821,

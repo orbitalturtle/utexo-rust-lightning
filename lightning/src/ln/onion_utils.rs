@@ -673,8 +673,11 @@ where
 			callback(PayloadCallbackAction::PushFront, payload);
 		}
 		last_rgb_payment = hop.rgb_payment();
-		// check this when adding support to trampoline hops in RLN
-		last_msat_amount = hop.payment_amount().unwrap_or(0) + cur_accumulated_fees;
+		// TrampolineHop has no payment_amount of its own (it carries no RGB-split amount), so its
+		// PathHop::payment_amount() always returns None; fall back to total_msat, which is exactly
+		// what payment_amount() would be for a hop that tracked it (see RouteHop::payment_amount,
+		// uniformly the path's own delivered value for every hop in the path).
+		last_msat_amount = hop.payment_amount().unwrap_or(total_msat) + cur_accumulated_fees;
 		if last_msat_amount >= 21000000 * 100000000 * 1000 {
 			return Err(APIError::InvalidRoute { err: "Channel fees overflowed?".to_owned() });
 		}
