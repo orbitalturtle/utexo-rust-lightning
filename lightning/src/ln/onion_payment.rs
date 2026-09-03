@@ -811,7 +811,7 @@ mod tests {
 		let hop_fee = 1;
 		let recipient_amount = total_amt_msat - hop_fee;
 		let hops = vec![
-			RouteHop { payment_amount: 0, rgb_payment: None,
+			RouteHop { payment_amount: recipient_amount, rgb_payment: None,
 				pubkey: hop_pk,
 				fee_msat: hop_fee,
 				cltv_expiry_delta: MIN_CLTV_EXPIRY_DELTA as u32,
@@ -820,7 +820,7 @@ mod tests {
 				channel_features: ChannelFeatures::empty(),
 				maybe_announced_channel: false,
 			},
-			RouteHop { payment_amount: 0, rgb_payment: None,
+			RouteHop { payment_amount: recipient_amount, rgb_payment: None,
 				pubkey: recipient_pk,
 				fee_msat: recipient_amount,
 				cltv_expiry_delta: TEST_FINAL_CLTV,
