@@ -9002,7 +9002,7 @@ pub fn test_nondust_htlc_excess_fees_are_dust() {
 	);
 	nodes[0].logger.assert_log("lightning::ln::channel",
 		format!("Cannot accept value that would put our total dust exposure at {} over the limit {} on counterparty commitment tx",
-			2531000, 2530000), 1);
+			2535000, 2530000), 1);
 	check_added_monitors(&nodes[0], 1);
 
 	// Clear the failed htlc
@@ -9098,9 +9098,11 @@ fn do_test_nondust_htlc_fees_dust_exposure_delta(features: ChannelTypeFeatures) 
 		*feerate_lock = HIGH_FEERATE as u32;
 	}
 
-	// Set `expected_dust_exposure_msat` to match the calculation in `FundedChannel::can_accept_incoming_htlc`
-	// only_static_remote_key: 500_492 + 22 * (724 + 172) / 1000 * 1000 + 22 * 663 / 1000 * 1000 = 533_492
-	// anchors_zero_htlc_fee: 500_492 + 22 * (1_124 + 172) / 1000 * 1000 = 528_492
+	// Set `expected_dust_exposure_msat` to match the calculation in `FundedChannel::can_accept_incoming_htlc`.
+	// `commitment_tx_base_weight` includes a flat +172 here (RGB coloring's OP_RETURN output), on
+	// top of the base weights BOLT3 specifies (724 / 1_124), so this fork's constants read:
+	// only_static_remote_key: 500_492 + 22 * (896 + 172) / 1000 * 1000 + 22 * 663 / 1000 * 1000 = 537_492
+	// anchors_zero_htlc_fee: 500_492 + 22 * (1_296 + 172) / 1000 * 1000 = 532_492
 	let mut expected_dust_exposure_msat = BASE_DUST_EXPOSURE_MSAT
 		+ EXCESS_FEERATE * (commitment_tx_base_weight(&features) + COMMITMENT_TX_WEIGHT_PER_HTLC)
 			/ 1000 * 1000;
@@ -9108,9 +9110,9 @@ fn do_test_nondust_htlc_fees_dust_exposure_delta(features: ChannelTypeFeatures) 
 	let (_, htlc_timeout_tx_fee_sat) = second_stage_tx_fees_sat(&features, EXCESS_FEERATE as u32);
 	if features == ChannelTypeFeatures::only_static_remote_key() {
 		expected_dust_exposure_msat += htlc_timeout_tx_fee_sat * 1000;
-		assert_eq!(expected_dust_exposure_msat, 533_492);
+		assert_eq!(expected_dust_exposure_msat, 537_492);
 	} else {
-		assert_eq!(expected_dust_exposure_msat, 528_492);
+		assert_eq!(expected_dust_exposure_msat, 532_492);
 	}
 
 	let mut default_config = test_default_channel_config();
@@ -9221,7 +9223,7 @@ fn do_test_nondust_htlc_fees_dust_exposure_delta(features: ChannelTypeFeatures) 
 	assert_eq!(nodes[1].node.list_channels()[0].pending_inbound_htlcs.len(), DUST_HTLC_COUNT);
 
 	// The `expected_dust_exposure_msat` for the outbound htlc changes in the non-anchor case, as the htlc success and timeout transactions have different weights
-	// only_static_remote_key: 500_492 + 22 * (724 + 172) / 1000 * 1000 + 22 * 703 / 1000 * 1000 = 534_492
+	// only_static_remote_key: 500_492 + 22 * (896 + 172) / 1000 * 1000 + 22 * 703 / 1000 * 1000 = 538_492
 	let (htlc_success_tx_fee_sat, _) = second_stage_tx_fees_sat(&features, EXCESS_FEERATE as u32);
 	if features == ChannelTypeFeatures::only_static_remote_key() {
 		expected_dust_exposure_msat = BASE_DUST_EXPOSURE_MSAT
@@ -9229,9 +9231,9 @@ fn do_test_nondust_htlc_fees_dust_exposure_delta(features: ChannelTypeFeatures) 
 				* (commitment_tx_base_weight(&features) + COMMITMENT_TX_WEIGHT_PER_HTLC)
 				/ 1000 * 1000
 			+ htlc_success_tx_fee_sat * 1000;
-		assert_eq!(expected_dust_exposure_msat, 534_492);
+		assert_eq!(expected_dust_exposure_msat, 538_492);
 	} else {
-		assert_eq!(expected_dust_exposure_msat, 528_492);
+		assert_eq!(expected_dust_exposure_msat, 532_492);
 	}
 
 	// Set node 1's max dust htlc exposure to 1msat below `expected_dust_exposure_msat`
