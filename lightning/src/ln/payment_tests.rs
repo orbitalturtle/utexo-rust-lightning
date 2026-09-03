@@ -2890,7 +2890,7 @@ fn auto_retry_partial_failure() {
 	let send_route = Route {
 		paths: vec![
 			Path {
-				hops: vec![RouteHop { payment_amount: 0, rgb_payment: None,
+				hops: vec![RouteHop { payment_amount: amt_msat / 2, rgb_payment: None,
 					pubkey: node_b_id,
 					node_features: nodes[1].node.node_features(),
 					short_channel_id: chan_1_id,
@@ -2902,7 +2902,7 @@ fn auto_retry_partial_failure() {
 				blinded_tail: None,
 			},
 			Path {
-				hops: vec![RouteHop { payment_amount: 0, rgb_payment: None,
+				hops: vec![RouteHop { payment_amount: amt_msat / 2, rgb_payment: None,
 					pubkey: node_b_id,
 					node_features: nodes[1].node.node_features(),
 					short_channel_id: chan_2_id,
@@ -2928,7 +2928,7 @@ fn auto_retry_partial_failure() {
 	let retry_1_route = Route {
 		paths: vec![
 			Path {
-				hops: vec![RouteHop { payment_amount: 0, rgb_payment: None,
+				hops: vec![RouteHop { payment_amount: amt_msat / 4, rgb_payment: None,
 					pubkey: node_b_id,
 					node_features: nodes[1].node.node_features(),
 					short_channel_id: chan_1_id,
@@ -2940,7 +2940,7 @@ fn auto_retry_partial_failure() {
 				blinded_tail: None,
 			},
 			Path {
-				hops: vec![RouteHop { payment_amount: 0, rgb_payment: None,
+				hops: vec![RouteHop { payment_amount: amt_msat / 4, rgb_payment: None,
 					pubkey: node_b_id,
 					node_features: nodes[1].node.node_features(),
 					short_channel_id: chan_3_id,
@@ -2965,7 +2965,7 @@ fn auto_retry_partial_failure() {
 
 	let retry_2_route = Route {
 		paths: vec![Path {
-			hops: vec![RouteHop { payment_amount: 0, rgb_payment: None,
+			hops: vec![RouteHop { payment_amount: amt_msat / 4, rgb_payment: None,
 				pubkey: node_b_id,
 				node_features: nodes[1].node.node_features(),
 				short_channel_id: chan_1_id,
@@ -3246,7 +3246,7 @@ fn retry_multi_path_single_failed_payment() {
 	let mut route = Route {
 		paths: vec![
 			Path {
-				hops: vec![RouteHop { payment_amount: 0, rgb_payment: None,
+				hops: vec![RouteHop { payment_amount: 10_000, rgb_payment: None,
 					pubkey: node_b_id,
 					node_features: nodes[1].node.node_features(),
 					short_channel_id: chans[0].short_channel_id.unwrap(),
@@ -3258,7 +3258,7 @@ fn retry_multi_path_single_failed_payment() {
 				blinded_tail: None,
 			},
 			Path {
-				hops: vec![RouteHop { payment_amount: 0, rgb_payment: None,
+				hops: vec![RouteHop { payment_amount: 100_000_001, rgb_payment: None,
 					pubkey: node_b_id,
 					node_features: nodes[1].node.node_features(),
 					short_channel_id: chans[1].short_channel_id.unwrap(),
@@ -3275,7 +3275,9 @@ fn retry_multi_path_single_failed_payment() {
 	nodes[0].router.expect_find_route(route_params.clone(), Ok(route.clone()));
 	// On retry, split the payment across both channels.
 	route.paths[0].hops[0].fee_msat = 50_000_001;
+	route.paths[0].hops[0].payment_amount = 50_000_001;
 	route.paths[1].hops[0].fee_msat = 50_000_000;
+	route.paths[1].hops[0].payment_amount = 50_000_000;
 	let mut pay_params = route.route_params.clone().unwrap().payment_params;
 	pay_params.previously_failed_channels.push(chans[1].short_channel_id.unwrap());
 
@@ -3361,7 +3363,7 @@ fn immediate_retry_on_failure() {
 	let chans = nodes[0].node.list_usable_channels();
 	let mut route = Route {
 		paths: vec![Path {
-			hops: vec![RouteHop { payment_amount: 0, rgb_payment: None,
+			hops: vec![RouteHop { payment_amount: 100_000_001, rgb_payment: None,
 				pubkey: node_b_id,
 				node_features: nodes[1].node.node_features(),
 				short_channel_id: chans[0].short_channel_id.unwrap(),
@@ -3379,7 +3381,9 @@ fn immediate_retry_on_failure() {
 	route.paths.push(route.paths[0].clone());
 	route.paths[0].hops[0].short_channel_id = chans[1].short_channel_id.unwrap();
 	route.paths[0].hops[0].fee_msat = 50_000_000;
+	route.paths[0].hops[0].payment_amount = 50_000_000;
 	route.paths[1].hops[0].fee_msat = 50_000_001;
+	route.paths[1].hops[0].payment_amount = 50_000_001;
 	let mut pay_params = route_params.payment_params.clone();
 	pay_params.previously_failed_channels.push(chans[0].short_channel_id.unwrap());
 	let retry_params = RouteParameters::from_payment_params_and_value(pay_params, amt_msat, None);
@@ -3462,7 +3466,7 @@ fn no_extra_retries_on_back_to_back_fail() {
 		paths: vec![
 			Path {
 				hops: vec![
-					RouteHop { payment_amount: 0, rgb_payment: None,
+					RouteHop { payment_amount: 100_000_000, rgb_payment: None,
 						pubkey: node_b_id,
 						node_features: nodes[1].node.node_features(),
 						short_channel_id: chan_1_scid,
@@ -3471,7 +3475,7 @@ fn no_extra_retries_on_back_to_back_fail() {
 						cltv_expiry_delta: 100,
 						maybe_announced_channel: true,
 					},
-					RouteHop { payment_amount: 0, rgb_payment: None,
+					RouteHop { payment_amount: 100_000_000, rgb_payment: None,
 						pubkey: node_c_id,
 						node_features: nodes[2].node.node_features(),
 						short_channel_id: chan_2_scid,
@@ -3485,7 +3489,7 @@ fn no_extra_retries_on_back_to_back_fail() {
 			},
 			Path {
 				hops: vec![
-					RouteHop { payment_amount: 0, rgb_payment: None,
+					RouteHop { payment_amount: 100_000_000, rgb_payment: None,
 						pubkey: node_b_id,
 						node_features: nodes[1].node.node_features(),
 						short_channel_id: chan_1_scid,
@@ -3494,7 +3498,7 @@ fn no_extra_retries_on_back_to_back_fail() {
 						cltv_expiry_delta: 100,
 						maybe_announced_channel: true,
 					},
-					RouteHop { payment_amount: 0, rgb_payment: None,
+					RouteHop { payment_amount: 100_000_000, rgb_payment: None,
 						pubkey: node_c_id,
 						node_features: nodes[2].node.node_features(),
 						short_channel_id: chan_2_scid,
@@ -3515,7 +3519,9 @@ fn no_extra_retries_on_back_to_back_fail() {
 	second_payment_params.previously_failed_channels = vec![chan_2_scid, chan_2_scid];
 	// On retry, we'll only return one path
 	route.paths.remove(1);
+	route.paths[0].hops[0].payment_amount = amt_msat;
 	route.paths[0].hops[1].fee_msat = amt_msat;
+	route.paths[0].hops[1].payment_amount = amt_msat;
 	let mut retry_params =
 		RouteParameters::from_payment_params_and_value(second_payment_params, amt_msat, None);
 	retry_params.max_total_routing_fee_msat = None;
@@ -3704,7 +3710,7 @@ fn test_simple_partial_retry() {
 		paths: vec![
 			Path {
 				hops: vec![
-					RouteHop { payment_amount: 0, rgb_payment: None,
+					RouteHop { payment_amount: 100_000_000, rgb_payment: None,
 						pubkey: node_b_id,
 						node_features: nodes[1].node.node_features(),
 						short_channel_id: chan_1_scid,
@@ -3713,7 +3719,7 @@ fn test_simple_partial_retry() {
 						cltv_expiry_delta: 100,
 						maybe_announced_channel: true,
 					},
-					RouteHop { payment_amount: 0, rgb_payment: None,
+					RouteHop { payment_amount: 100_000_000, rgb_payment: None,
 						pubkey: node_c_id,
 						node_features: nodes[2].node.node_features(),
 						short_channel_id: chan_2_scid,
@@ -3727,7 +3733,7 @@ fn test_simple_partial_retry() {
 			},
 			Path {
 				hops: vec![
-					RouteHop { payment_amount: 0, rgb_payment: None,
+					RouteHop { payment_amount: 100_000_000, rgb_payment: None,
 						pubkey: node_b_id,
 						node_features: nodes[1].node.node_features(),
 						short_channel_id: chan_1_scid,
@@ -3736,7 +3742,7 @@ fn test_simple_partial_retry() {
 						cltv_expiry_delta: 100,
 						maybe_announced_channel: true,
 					},
-					RouteHop { payment_amount: 0, rgb_payment: None,
+					RouteHop { payment_amount: 100_000_000, rgb_payment: None,
 						pubkey: node_c_id,
 						node_features: nodes[2].node.node_features(),
 						short_channel_id: chan_2_scid,
@@ -3916,7 +3922,7 @@ fn test_threaded_payment_retries() {
 		paths: vec![
 			Path {
 				hops: vec![
-					RouteHop { payment_amount: 0, rgb_payment: None,
+					RouteHop { payment_amount: amt_msat / 1000, rgb_payment: None,
 						pubkey: node_b_id,
 						node_features: nodes[1].node.node_features(),
 						short_channel_id: chan_1_scid,
@@ -3925,7 +3931,7 @@ fn test_threaded_payment_retries() {
 						cltv_expiry_delta: 100,
 						maybe_announced_channel: true,
 					},
-					RouteHop { payment_amount: 0, rgb_payment: None,
+					RouteHop { payment_amount: amt_msat / 1000, rgb_payment: None,
 						pubkey: node_d_id,
 						node_features: nodes[2].node.node_features(),
 						short_channel_id: 42, // Set a random SCID which nodes[1] will fail as unknown
@@ -3939,7 +3945,7 @@ fn test_threaded_payment_retries() {
 			},
 			Path {
 				hops: vec![
-					RouteHop { payment_amount: 0, rgb_payment: None,
+					RouteHop { payment_amount: amt_msat - amt_msat / 1000, rgb_payment: None,
 						pubkey: node_c_id,
 						node_features: nodes[2].node.node_features(),
 						short_channel_id: chan_3_scid,
@@ -3948,7 +3954,7 @@ fn test_threaded_payment_retries() {
 						cltv_expiry_delta: 100,
 						maybe_announced_channel: true,
 					},
-					RouteHop { payment_amount: 0, rgb_payment: None,
+					RouteHop { payment_amount: amt_msat - amt_msat / 1000, rgb_payment: None,
 						pubkey: node_d_id,
 						node_features: nodes[3].node.node_features(),
 						short_channel_id: chan_4_scid,
