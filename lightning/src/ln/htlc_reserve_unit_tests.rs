@@ -168,6 +168,8 @@ pub fn test_channel_reserve_holding_cell_htlcs() {
 		let (mut route, our_payment_hash, _, our_payment_secret) =
 			get_route_and_payment_hash!(nodes[0], nodes[2], payment_params, recv_value_0);
 		route.paths[0].hops.last_mut().unwrap().fee_msat += 1;
+		let new_value = route.paths[0].hops.last().unwrap().fee_msat;
+		for hop in route.paths[0].hops.iter_mut() { hop.payment_amount = new_value; }
 		assert!(route.paths[0].hops.iter().rev().skip(1).all(|h| h.fee_msat == feemsat));
 
 		let onion = RecipientOnionFields::secret_only(our_payment_secret);
@@ -266,6 +268,8 @@ pub fn test_channel_reserve_holding_cell_htlcs() {
 	{
 		let mut route = route_1.clone();
 		route.paths[0].hops.last_mut().unwrap().fee_msat = recv_value_2 + 1;
+		let new_value = route.paths[0].hops.last().unwrap().fee_msat;
+		for hop in route.paths[0].hops.iter_mut() { hop.payment_amount = new_value; }
 		let (_, our_payment_hash, our_payment_secret) = get_payment_preimage_hash!(nodes[2]);
 		let onion = RecipientOnionFields::secret_only(our_payment_secret);
 		let id = PaymentId(our_payment_hash.0);
@@ -307,6 +311,8 @@ pub fn test_channel_reserve_holding_cell_htlcs() {
 		let (mut route, our_payment_hash, _, our_payment_secret) =
 			get_route_and_payment_hash!(nodes[0], nodes[2], recv_value_22);
 		route.paths[0].hops.last_mut().unwrap().fee_msat += 1;
+		let new_value = route.paths[0].hops.last().unwrap().fee_msat;
+		for hop in route.paths[0].hops.iter_mut() { hop.payment_amount = new_value; }
 		let onion = RecipientOnionFields::secret_only(our_payment_secret);
 		let id = PaymentId(our_payment_hash.0);
 		let res = nodes[0].node.send_payment_with_route(route, our_payment_hash, onion, id);
@@ -764,6 +770,8 @@ pub fn test_basic_channel_reserve() {
 	let (mut route, our_payment_hash, _, our_payment_secret) =
 		get_route_and_payment_hash!(nodes[0], nodes[1], max_can_send);
 	route.paths[0].hops.last_mut().unwrap().fee_msat += 1;
+	let new_value = route.paths[0].hops.last().unwrap().fee_msat;
+	for hop in route.paths[0].hops.iter_mut() { hop.payment_amount = new_value; }
 	let onion = RecipientOnionFields::secret_only(our_payment_secret);
 	let id = PaymentId(our_payment_hash.0);
 	let err = nodes[0].node.send_payment_with_route(route, our_payment_hash, onion, id);
@@ -804,6 +812,7 @@ pub fn do_test_fee_spike_buffer(cfg: Option<UserConfig>, htlc_fails: bool) {
 	let (mut route, payment_hash, _, payment_secret) =
 		get_route_and_payment_hash!(nodes[0], nodes[1], 3460000);
 	route.paths[0].hops[0].fee_msat += 1;
+	route.paths[0].hops[0].payment_amount = route.paths[0].hops[0].fee_msat;
 	// Need to manually create the update_add_htlc message to go around the channel reserve check in send_htlc()
 	let secp_ctx = Secp256k1::new();
 	let session_priv = SecretKey::from_slice(&[42; 32]).expect("RNG is bad!");
@@ -1046,6 +1055,7 @@ pub fn test_chan_reserve_violation_inbound_htlc_outbound_channel() {
 	let (mut route, payment_hash, _, payment_secret) =
 		get_route_and_payment_hash!(nodes[1], nodes[0], 1000);
 	route.paths[0].hops[0].fee_msat = 700_000;
+	route.paths[0].hops[0].payment_amount = 700_000;
 	// Need to manually create the update_add_htlc message to go around the channel reserve check in send_htlc()
 	let secp_ctx = Secp256k1::new();
 	let session_priv = SecretKey::from_slice(&[42; 32]).unwrap();
@@ -1133,6 +1143,7 @@ pub fn test_chan_reserve_dust_inbound_htlcs_outbound_chan() {
 	let (mut route, our_payment_hash, _, our_payment_secret) =
 		get_route_and_payment_hash!(nodes[1], nodes[0], dust_amt);
 	route.paths[0].hops[0].fee_msat += 1;
+	route.paths[0].hops[0].payment_amount = route.paths[0].hops[0].fee_msat;
 	let onion = RecipientOnionFields::secret_only(our_payment_secret);
 	let id = PaymentId(our_payment_hash.0);
 	let res = nodes[1].node.send_payment_with_route(route, our_payment_hash, onion, id);
@@ -1225,6 +1236,7 @@ pub fn test_chan_reserve_violation_inbound_htlc_inbound_chan() {
 	let amt_msat_2 = recv_value_2 + total_routing_fee_msat;
 	let mut route_2 = route_1.clone();
 	route_2.paths[0].hops.last_mut().unwrap().fee_msat = amt_msat_2;
+	for hop in route_2.paths[0].hops.iter_mut() { hop.payment_amount = amt_msat_2; }
 
 	// Need to manually create the update_add_htlc message to go around the channel reserve check in send_htlc()
 	let secp_ctx = Secp256k1::new();
