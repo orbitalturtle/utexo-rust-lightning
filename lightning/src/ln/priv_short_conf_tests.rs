@@ -690,6 +690,7 @@ fn test_scid_alias_returned() {
 	);
 
 	route.paths[0].hops[1].fee_msat = 10_000_000; // Overshoot the last channel's value
+	for hop in route.paths[0].hops.iter_mut() { hop.payment_amount = 10_000_000; }
 
 	// Route the HTLC through to the destination.
 	let onion = RecipientOnionFields::secret_only(payment_secret);
@@ -727,6 +728,7 @@ fn test_scid_alias_returned() {
 
 	route.paths[0].hops[1].fee_msat = 10_000; // Reset to the correct payment amount
 	route.paths[0].hops[0].fee_msat = 0; // But set fee paid to the middle hop to 0
+	for hop in route.paths[0].hops.iter_mut() { hop.payment_amount = 10_000; }
 
 	// Route the HTLC through to the destination.
 	let onion = RecipientOnionFields::secret_only(payment_secret);
