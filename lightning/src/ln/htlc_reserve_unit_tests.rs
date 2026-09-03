@@ -1323,6 +1323,7 @@ pub fn test_update_add_htlc_bolt2_sender_value_below_minimum_msat() {
 	let (mut route, our_payment_hash, _, our_payment_secret) =
 		get_route_and_payment_hash!(nodes[0], nodes[1], 100000);
 	route.paths[0].hops[0].fee_msat = 100;
+	route.paths[0].hops[0].payment_amount = 100;
 
 	let onion = RecipientOnionFields::secret_only(our_payment_secret);
 	let id = PaymentId(our_payment_hash.0);
@@ -1344,6 +1345,7 @@ pub fn test_update_add_htlc_bolt2_sender_zero_value_msat() {
 	let (mut route, our_payment_hash, _, our_payment_secret) =
 		get_route_and_payment_hash!(nodes[0], nodes[1], 100000);
 	route.paths[0].hops[0].fee_msat = 0;
+	route.paths[0].hops[0].payment_amount = 0;
 	let onion = RecipientOnionFields::secret_only(our_payment_secret);
 	let id = PaymentId(our_payment_hash.0);
 	let res = nodes[0].node.send_payment_with_route(route, our_payment_hash, onion, id);
@@ -1503,6 +1505,7 @@ pub fn test_update_add_htlc_bolt2_sender_exceed_max_htlc_value_in_flight() {
 	// Manually create a route over our max in flight (which our router normally automatically
 	// limits us to.
 	route.paths[0].hops[0].fee_msat = max_in_flight + 1;
+	route.paths[0].hops[0].payment_amount = max_in_flight + 1;
 	let onion = RecipientOnionFields::secret_only(our_payment_secret);
 	let id = PaymentId(our_payment_hash.0);
 	let res = nodes[0].node.send_payment_with_route(route, our_payment_hash, onion, id);
