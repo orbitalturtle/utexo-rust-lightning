@@ -1033,6 +1033,7 @@ fn test_onion_failure() {
 	let mut bogus_route = route.clone();
 	let route_len = bogus_route.paths[0].hops.len();
 	bogus_route.paths[0].hops[route_len - 1].fee_msat = amt_to_forward;
+	for hop in bogus_route.paths[0].hops.iter_mut() { hop.payment_amount = amt_to_forward; }
 	run_onion_failure_test(
 		"amount_below_minimum",
 		100,
@@ -1056,6 +1057,7 @@ fn test_onion_failure() {
 
 	// Test a positive test-case with one extra msat, meeting the minimum.
 	bogus_route.paths[0].hops[route_len - 1].fee_msat = amt_to_forward + 1;
+	for hop in bogus_route.paths[0].hops.iter_mut() { hop.payment_amount = amt_to_forward + 1; }
 	let preimage =
 		send_along_route(&nodes[0], bogus_route, &[&nodes[1], &nodes[2]], amt_to_forward + 1).0;
 	claim_payment(&nodes[0], &[&nodes[1], &nodes[2]], preimage);
