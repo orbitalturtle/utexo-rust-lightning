@@ -123,7 +123,7 @@ pub fn fake_network_test() {
 
 	// Do some rebalance loop payments, simultaneously
 	let mut hops = vec![
-		RouteHop { payment_amount: 0, rgb_payment: None,
+		RouteHop { payment_amount: 1000000, rgb_payment: None,
 			pubkey: node_c_id,
 			node_features: NodeFeatures::empty(),
 			short_channel_id: chan_2.0.contents.short_channel_id,
@@ -132,7 +132,7 @@ pub fn fake_network_test() {
 			cltv_expiry_delta: chan_3.0.contents.cltv_expiry_delta as u32,
 			maybe_announced_channel: true,
 		},
-		RouteHop { payment_amount: 0, rgb_payment: None,
+		RouteHop { payment_amount: 1000000, rgb_payment: None,
 			pubkey: node_d_id,
 			node_features: NodeFeatures::empty(),
 			short_channel_id: chan_3.0.contents.short_channel_id,
@@ -141,7 +141,7 @@ pub fn fake_network_test() {
 			cltv_expiry_delta: chan_4.1.contents.cltv_expiry_delta as u32,
 			maybe_announced_channel: true,
 		},
-		RouteHop { payment_amount: 0, rgb_payment: None,
+		RouteHop { payment_amount: 1000000, rgb_payment: None,
 			pubkey: node_b_id,
 			node_features: nodes[1].node.node_features(),
 			short_channel_id: chan_4.0.contents.short_channel_id,
@@ -167,7 +167,7 @@ pub fn fake_network_test() {
 	let payment_preimage_1 = send_along_route(&nodes[1], route, path, 1000000).0;
 
 	let mut hops = vec![
-		RouteHop { payment_amount: 0, rgb_payment: None,
+		RouteHop { payment_amount: 1000000, rgb_payment: None,
 			pubkey: node_d_id,
 			node_features: NodeFeatures::empty(),
 			short_channel_id: chan_4.0.contents.short_channel_id,
@@ -176,7 +176,7 @@ pub fn fake_network_test() {
 			cltv_expiry_delta: chan_3.1.contents.cltv_expiry_delta as u32,
 			maybe_announced_channel: true,
 		},
-		RouteHop { payment_amount: 0, rgb_payment: None,
+		RouteHop { payment_amount: 1000000, rgb_payment: None,
 			pubkey: node_c_id,
 			node_features: NodeFeatures::empty(),
 			short_channel_id: chan_3.0.contents.short_channel_id,
@@ -185,7 +185,7 @@ pub fn fake_network_test() {
 			cltv_expiry_delta: chan_2.1.contents.cltv_expiry_delta as u32,
 			maybe_announced_channel: true,
 		},
-		RouteHop { payment_amount: 0, rgb_payment: None,
+		RouteHop { payment_amount: 1000000, rgb_payment: None,
 			pubkey: node_b_id,
 			node_features: nodes[1].node.node_features(),
 			short_channel_id: chan_2.0.contents.short_channel_id,
@@ -6860,6 +6860,8 @@ pub fn test_onion_value_mpp_set_calculation() {
 	path_1.hops[1].pubkey = node_d_id;
 	path_1.hops[1].short_channel_id = chan_3_id;
 	path_1.hops[1].fee_msat = 100_000;
+	path_1.hops[0].payment_amount = 100_000;
+	path_1.hops[1].payment_amount = 100_000;
 	route.paths.push(path_1);
 
 	let mut path_2 = sample_path.clone();
@@ -6868,6 +6870,8 @@ pub fn test_onion_value_mpp_set_calculation() {
 	path_2.hops[1].pubkey = node_d_id;
 	path_2.hops[1].short_channel_id = chan_4_id;
 	path_2.hops[1].fee_msat = 1_000;
+	path_2.hops[0].payment_amount = 1_000;
+	path_2.hops[1].payment_amount = 1_000;
 	route.paths.push(path_2);
 
 	// Send payment
@@ -7005,6 +7009,8 @@ fn do_test_overshoot_mpp(msat_amounts: &[u64], total_msat: u64) {
 		path.hops[1].pubkey = nodes[dst_idx].node.get_our_node_id();
 		path.hops[1].short_channel_id = dst_chan_ids[i];
 		path.hops[1].fee_msat = msat_amounts[i];
+		path.hops[0].payment_amount = msat_amounts[i];
+		path.hops[1].payment_amount = msat_amounts[i];
 		route.paths.push(path);
 	}
 
@@ -8687,6 +8693,8 @@ fn do_test_max_dust_htlc_exposure(
 		} else {
 			dust_htlc_on_counterparty_tx_msat + 1
 		};
+		let new_value = route.paths[0].hops.last().unwrap().fee_msat;
+		for hop in route.paths[0].hops.iter_mut() { hop.payment_amount = new_value; }
 		// With default dust exposure: 5000 sats
 		if on_holder_tx {
 			let onion = RecipientOnionFields::secret_only(payment_secret);
@@ -8741,6 +8749,8 @@ fn do_test_max_dust_htlc_exposure(
 		}
 	} else if exposure_breach_event == ExposureEvent::AtUpdateFeeOutbound {
 		route.paths[0].hops.last_mut().unwrap().fee_msat = 2_500_000;
+		let new_value = route.paths[0].hops.last().unwrap().fee_msat;
+		for hop in route.paths[0].hops.iter_mut() { hop.payment_amount = new_value; }
 		// For the multiplier dust exposure limit, since it scales with feerate,
 		// we need to add a lot of HTLCs that will become dust at the new feerate
 		// to cross the threshold.
