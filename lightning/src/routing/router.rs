@@ -3699,6 +3699,7 @@ where L::Target: Logger {
 
 	let mut paths = Vec::new();
 	for payment_path in selected_route {
+		let path_value_msat = payment_path.get_value_msat();
 		let mut hops = Vec::with_capacity(payment_path.hops.len());
 		for (hop, node_features) in payment_path.hops.iter()
 			.filter(|(h, _)| h.candidate.short_channel_id().is_some())
@@ -3729,7 +3730,7 @@ where L::Target: Logger {
 				fee_msat: hop.fee_msat,
 				cltv_expiry_delta: hop.candidate.cltv_expiry_delta(),
 				maybe_announced_channel,
-				payment_amount: final_value_msat,
+				payment_amount: path_value_msat,
 				rgb_payment: None,
 			});
 		}
