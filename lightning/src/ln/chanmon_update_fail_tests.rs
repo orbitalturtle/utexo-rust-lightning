@@ -2120,7 +2120,7 @@ fn do_during_funding_monitor_fail(
 	let node_a_id = nodes[0].node.get_our_node_id();
 	let node_b_id = nodes[1].node.get_our_node_id();
 
-	nodes[0].node.create_channel(node_b_id, 100000, 10001, 43, None, None).unwrap();
+	nodes[0].node.create_channel(node_b_id, 100000, 10001, 43, None, None, None).unwrap();
 	nodes[1].node.handle_open_channel(
 		node_a_id,
 		&get_event_msg!(nodes[0], MessageSendEvent::SendOpenChannel, node_b_id),
@@ -3233,7 +3233,7 @@ fn do_test_outbound_reload_without_init_mon(use_0conf: bool) {
 	let node_a_id = nodes[0].node.get_our_node_id();
 	let node_b_id = nodes[1].node.get_our_node_id();
 
-	nodes[0].node.create_channel(node_b_id, 100000, 10001, 43, None, None).unwrap();
+	nodes[0].node.create_channel(node_b_id, 100000, 10001, 43, None, None, None).unwrap();
 	nodes[1].node.handle_open_channel(
 		node_a_id,
 		&get_event_msg!(nodes[0], MessageSendEvent::SendOpenChannel, node_b_id),
@@ -3343,7 +3343,7 @@ fn do_test_inbound_reload_without_init_mon(use_0conf: bool, lock_commitment: boo
 	let node_a_id = nodes[0].node.get_our_node_id();
 	let node_b_id = nodes[1].node.get_our_node_id();
 
-	nodes[0].node.create_channel(node_b_id, 100000, 10001, 43, None, None).unwrap();
+	nodes[0].node.create_channel(node_b_id, 100000, 10001, 43, None, None, None).unwrap();
 	nodes[1].node.handle_open_channel(
 		node_a_id,
 		&get_event_msg!(nodes[0], MessageSendEvent::SendOpenChannel, node_b_id),
@@ -5096,7 +5096,7 @@ fn test_mpp_claim_to_holding_cell() {
 	let onion = RecipientOnionFields::secret_only(payment_secret_2);
 	let id = PaymentId([42; 32]);
 	let pay_params = PaymentParameters::from_node_id(node_d_id, TEST_FINAL_CLTV);
-	let route_params = RouteParameters::from_payment_params_and_value(pay_params, 400_000);
+	let route_params = RouteParameters::from_payment_params_and_value(pay_params, 400_000, None);
 	nodes[2].node.send_payment(paymnt_hash_2, onion, id, route_params, Retry::Attempts(0)).unwrap();
 	check_added_monitors(&nodes[2], 1);
 

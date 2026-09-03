@@ -2274,7 +2274,6 @@ pub fn get_commitment_transaction_number_obscure_factor(
 		| ((res[31] as u64) << 0 * 8)
 }
 
-/*
 #[cfg(test)]
 mod tests {
 	use super::{ChannelPublicKeys, CounterpartyCommitmentSecrets};
@@ -2409,7 +2408,7 @@ mod tests {
 		assert_eq!(tx.built.transaction.output[0].script_pubkey, shared_anchor_script_pubkey());
 		assert_eq!(tx.built.transaction.output[0].value.to_sat(), 240); // remember total channel value is 4000sat
 
-		let received_htlc = HTLCOutputInCommitment {
+		let received_htlc = HTLCOutputInCommitment { rgb_payment: None,
 			offered: false,
 			amount_msat: 400000,
 			cltv_expiry: 100,
@@ -2417,7 +2416,7 @@ mod tests {
 			transaction_output_index: None,
 		};
 
-		let offered_htlc = HTLCOutputInCommitment {
+		let offered_htlc = HTLCOutputInCommitment { rgb_payment: None,
 			offered: true,
 			amount_msat: 600000,
 			cltv_expiry: 100,
@@ -2978,7 +2977,7 @@ mod tests {
 		}
 
 		// script_pubkey: Script(OP_0 OP_PUSHBYTES_32 1b202f6bdf42cd8ba08e263868b5bd0cf5a7f95c227c27e1935984a8f6130fa3)
-		let small_htlc = HTLCOutputInCommitment {
+		let small_htlc = HTLCOutputInCommitment { rgb_payment: None,
 			offered: true,
 			amount_msat: 10_000,
 			cltv_expiry: 123,
@@ -3010,4 +3009,3 @@ mod tests {
 		swap_htlcs!(small_htlc, big_htlc);
 	}
 }
-*/

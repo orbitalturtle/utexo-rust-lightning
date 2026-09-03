@@ -11,7 +11,6 @@
 //! payments/messages between them, and often checking the resulting ChannelMonitors are able to
 //! claim outputs on-chain.
 
-/*
 use crate::chain;
 use crate::chain::chaininterface::LowerBoundedFeeEstimator;
 use crate::chain::channelmonitor;
@@ -124,7 +123,7 @@ pub fn fake_network_test() {
 
 	// Do some rebalance loop payments, simultaneously
 	let mut hops = vec![
-		RouteHop {
+		RouteHop { payment_amount: 0, rgb_payment: None,
 			pubkey: node_c_id,
 			node_features: NodeFeatures::empty(),
 			short_channel_id: chan_2.0.contents.short_channel_id,
@@ -133,7 +132,7 @@ pub fn fake_network_test() {
 			cltv_expiry_delta: chan_3.0.contents.cltv_expiry_delta as u32,
 			maybe_announced_channel: true,
 		},
-		RouteHop {
+		RouteHop { payment_amount: 0, rgb_payment: None,
 			pubkey: node_d_id,
 			node_features: NodeFeatures::empty(),
 			short_channel_id: chan_3.0.contents.short_channel_id,
@@ -142,7 +141,7 @@ pub fn fake_network_test() {
 			cltv_expiry_delta: chan_4.1.contents.cltv_expiry_delta as u32,
 			maybe_announced_channel: true,
 		},
-		RouteHop {
+		RouteHop { payment_amount: 0, rgb_payment: None,
 			pubkey: node_b_id,
 			node_features: nodes[1].node.node_features(),
 			short_channel_id: chan_4.0.contents.short_channel_id,
@@ -159,7 +158,7 @@ pub fn fake_network_test() {
 	let payment_params = PaymentParameters::from_node_id(node_b_id, TEST_FINAL_CLTV)
 		.with_bolt11_features(nodes[1].node.bolt11_invoice_features())
 		.unwrap();
-	let route_params = RouteParameters::from_payment_params_and_value(payment_params, 1000000);
+	let route_params = RouteParameters::from_payment_params_and_value(payment_params, 1000000, None);
 	let route = Route {
 		paths: vec![Path { hops, blinded_tail: None }],
 		route_params: Some(route_params.clone()),
@@ -168,7 +167,7 @@ pub fn fake_network_test() {
 	let payment_preimage_1 = send_along_route(&nodes[1], route, path, 1000000).0;
 
 	let mut hops = vec![
-		RouteHop {
+		RouteHop { payment_amount: 0, rgb_payment: None,
 			pubkey: node_d_id,
 			node_features: NodeFeatures::empty(),
 			short_channel_id: chan_4.0.contents.short_channel_id,
@@ -177,7 +176,7 @@ pub fn fake_network_test() {
 			cltv_expiry_delta: chan_3.1.contents.cltv_expiry_delta as u32,
 			maybe_announced_channel: true,
 		},
-		RouteHop {
+		RouteHop { payment_amount: 0, rgb_payment: None,
 			pubkey: node_c_id,
 			node_features: NodeFeatures::empty(),
 			short_channel_id: chan_3.0.contents.short_channel_id,
@@ -186,7 +185,7 @@ pub fn fake_network_test() {
 			cltv_expiry_delta: chan_2.1.contents.cltv_expiry_delta as u32,
 			maybe_announced_channel: true,
 		},
-		RouteHop {
+		RouteHop { payment_amount: 0, rgb_payment: None,
 			pubkey: node_b_id,
 			node_features: nodes[1].node.node_features(),
 			short_channel_id: chan_2.0.contents.short_channel_id,
@@ -2243,7 +2242,7 @@ pub fn fail_backward_pending_htlc_upon_channel_failure() {
 		let session_priv = SecretKey::from_slice(&[42; 32]).unwrap();
 		let current_height = nodes[1].node.best_block.read().unwrap().height + 1;
 		let recipient_onion_fields = RecipientOnionFields::secret_only(payment_secret);
-		let (onion_payloads, _amount_msat, cltv_expiry) = onion_utils::build_onion_payloads(
+		let (onion_payloads, _amount_msat, cltv_expiry, _) = onion_utils::build_onion_payloads(
 			&route.paths[0],
 			50_000,
 			&recipient_onion_fields,
@@ -2260,7 +2259,7 @@ pub fn fail_backward_pending_htlc_upon_channel_failure() {
 				.unwrap();
 
 		// Send a 0-msat update_add_htlc to fail the channel.
-		let update_add_htlc = msgs::UpdateAddHTLC {
+		let update_add_htlc = msgs::UpdateAddHTLC { rgb_payment: None,
 			channel_id: chan.2,
 			htlc_id: 0,
 			amount_msat: 0,
@@ -2500,7 +2499,7 @@ pub fn test_peer_disconnected_before_funding_broadcasted() {
 	// Open a channel between `nodes[0]` and `nodes[1]`, for which the funding transaction is never
 	// broadcasted, even though it's created by `nodes[0]`.
 	let expected_temporary_channel_id =
-		nodes[0].node.create_channel(node_b_id, 1_000_000, 500_000_000, 42, None, None).unwrap();
+		nodes[0].node.create_channel(node_b_id, 1_000_000, 500_000_000, 42, None, None, None).unwrap();
 	let open_channel = get_event_msg!(nodes[0], MessageSendEvent::SendOpenChannel, node_b_id);
 	nodes[1].node.handle_open_channel(node_a_id, &open_channel);
 	let accept_channel = get_event_msg!(nodes[1], MessageSendEvent::SendAcceptChannel, node_a_id);
@@ -5919,7 +5918,7 @@ pub fn test_check_htlc_underpaying() {
 	let payment_params = PaymentParameters::from_node_id(node_b_id, TEST_FINAL_CLTV)
 		.with_bolt11_features(nodes[1].node.bolt11_invoice_features())
 		.unwrap();
-	let route_params = RouteParameters::from_payment_params_and_value(payment_params, 10_000);
+	let route_params = RouteParameters::from_payment_params_and_value(payment_params, 10_000, None);
 	let route = get_route(
 		&node_a_id,
 		&route_params,
@@ -6221,7 +6220,7 @@ pub fn test_bump_penalty_txn_on_revoked_htlcs() {
 		.unwrap();
 	let scorer = test_utils::TestScorer::new();
 	let random_seed_bytes = chanmon_cfgs[1].keys_manager.get_secure_random_bytes();
-	let route_params = RouteParameters::from_payment_params_and_value(payment_params, 3_000_000);
+	let route_params = RouteParameters::from_payment_params_and_value(payment_params, 3_000_000, None);
 	let route = get_route(
 		&node_a_id,
 		&route_params,
@@ -6237,7 +6236,7 @@ pub fn test_bump_penalty_txn_on_revoked_htlcs() {
 	let payment_params = PaymentParameters::from_node_id(node_a_id, 50)
 		.with_bolt11_features(nodes[0].node.bolt11_invoice_features())
 		.unwrap();
-	let route_params = RouteParameters::from_payment_params_and_value(payment_params, 3_000_000);
+	let route_params = RouteParameters::from_payment_params_and_value(payment_params, 3_000_000, None);
 	let route = get_route(
 		&node_b_id,
 		&route_params,
@@ -6726,7 +6725,7 @@ pub fn test_override_channel_config() {
 
 	nodes[0]
 		.node
-		.create_channel(node_b_id, 16_000_000, 12_000_000, 42, None, Some(override_config))
+		.create_channel(node_b_id, 16_000_000, 12_000_000, 42, None, Some(override_config), None)
 		.unwrap();
 
 	// Assert the channel created by node0 is using the override config.
@@ -6749,7 +6748,7 @@ pub fn test_override_0msat_htlc_minimum() {
 
 	nodes[0]
 		.node
-		.create_channel(node_b_id, 16_000_000, 12_000_000, 42, None, Some(zero_config))
+		.create_channel(node_b_id, 16_000_000, 12_000_000, 42, None, Some(zero_config), None)
 		.unwrap();
 	let res = get_event_msg!(nodes[0], MessageSendEvent::SendOpenChannel, node_b_id);
 	assert_eq!(res.common_fields.htlc_minimum_msat, 1);
@@ -6907,7 +6906,7 @@ pub fn test_onion_value_mpp_set_calculation() {
 				&session_priv,
 			);
 			let recipient_onion_fields = RecipientOnionFields::secret_only(payment_secret);
-			let (mut onion_payloads, _, _) = onion_utils::build_onion_payloads(
+			let (mut onion_payloads, _, _, _) = onion_utils::build_onion_payloads(
 				&route.paths[0],
 				100_000,
 				&recipient_onion_fields,
@@ -7523,7 +7522,7 @@ pub fn test_pre_lockin_no_chan_closed_update() {
 	let node_b_id = nodes[1].node.get_our_node_id();
 
 	// Create an initial channel
-	nodes[0].node.create_channel(node_b_id, 100000, 10001, 42, None, None).unwrap();
+	nodes[0].node.create_channel(node_b_id, 100000, 10001, 42, None, None, None).unwrap();
 	let mut open_chan_msg = get_event_msg!(nodes[0], MessageSendEvent::SendOpenChannel, node_b_id);
 	nodes[1].node.handle_open_channel(node_a_id, &open_chan_msg);
 	let accept_chan_msg = get_event_msg!(nodes[1], MessageSendEvent::SendAcceptChannel, node_a_id);
@@ -8547,7 +8546,7 @@ fn do_test_max_dust_htlc_exposure(
 	let node_a_id = nodes[0].node.get_our_node_id();
 	let node_b_id = nodes[1].node.get_our_node_id();
 
-	nodes[0].node.create_channel(node_b_id, 1_000_000, 500_000_000, 42, None, None).unwrap();
+	nodes[0].node.create_channel(node_b_id, 1_000_000, 500_000_000, 42, None, None, None).unwrap();
 	let mut open_channel = get_event_msg!(nodes[0], MessageSendEvent::SendOpenChannel, node_b_id);
 	open_channel.common_fields.max_htlc_value_in_flight_msat = 50_000_000;
 	open_channel.common_fields.max_accepted_htlcs = 60;
@@ -9512,7 +9511,7 @@ pub fn test_remove_expired_outbound_unfunded_channels() {
 	let node_b_id = nodes[1].node.get_our_node_id();
 
 	let temp_channel_id =
-		nodes[0].node.create_channel(node_b_id, 100_000, 0, 42, None, None).unwrap();
+		nodes[0].node.create_channel(node_b_id, 100_000, 0, 42, None, None, None).unwrap();
 	let open_channel_message =
 		get_event_msg!(nodes[0], MessageSendEvent::SendOpenChannel, node_b_id);
 	nodes[1].node.handle_open_channel(node_a_id, &open_channel_message);
@@ -9576,7 +9575,7 @@ pub fn test_remove_expired_inbound_unfunded_channels() {
 	let node_b_id = nodes[1].node.get_our_node_id();
 
 	let temp_channel_id =
-		nodes[0].node.create_channel(node_b_id, 100_000, 0, 42, None, None).unwrap();
+		nodes[0].node.create_channel(node_b_id, 100_000, 0, 42, None, None, None).unwrap();
 	let open_channel_message =
 		get_event_msg!(nodes[0], MessageSendEvent::SendOpenChannel, node_b_id);
 	nodes[1].node.handle_open_channel(node_a_id, &open_channel_message);
@@ -10000,4 +9999,3 @@ pub fn test_dust_exposure_holding_cell_assertion() {
 	// Now that everything has settled, make sure the channels still work with a simple claim.
 	claim_payment(&nodes[2], &[&nodes[1]], payment_preimage_cb);
 }
-*/

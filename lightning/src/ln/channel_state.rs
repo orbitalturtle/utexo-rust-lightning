@@ -708,7 +708,7 @@ mod tests {
 	#[test]
 	fn test_channel_details_serialization() {
 		#[allow(deprecated)]
-		let channel_details = ChannelDetails {
+		let channel_details = ChannelDetails { inbound_htlc_maximum_rgb: 0, next_outbound_htlc_limit_rgb: 0,
 			channel_id: ChannelId::new_zero(),
 			counterparty: ChannelCounterparty {
 				features: Features::empty(),

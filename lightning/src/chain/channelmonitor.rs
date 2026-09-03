@@ -7049,7 +7049,7 @@ mod tests {
 				{
 					let mut res = Vec::new();
 					for (idx, preimage) in $preimages_slice.iter().enumerate() {
-						res.push(HTLCOutputInCommitment {
+						res.push(HTLCOutputInCommitment { rgb_payment: None,
 							offered: true,
 							amount_msat: 0,
 							cltv_expiry: 0,
@@ -7088,7 +7088,7 @@ mod tests {
 			SecretKey::from_slice(&[41; 32]).unwrap(),
 			[41; 32],
 			[0; 32],
-			[0; 32],
+			std::path::PathBuf::new(), [0; 32],
 		);
 
 		let counterparty_pubkeys = ChannelPublicKeys {
@@ -7203,7 +7203,7 @@ mod tests {
 		use crate::ln::channel_keys::{HtlcKey, HtlcBasepoint};
 		macro_rules! sign_input {
 			($sighash_parts: expr, $idx: expr, $amount: expr, $weight: expr, $sum_actual_sigs: expr, $opt_anchors: expr) => {
-				let htlc = HTLCOutputInCommitment {
+				let htlc = HTLCOutputInCommitment { rgb_payment: None,
 					offered: if *$weight == weight_revoked_offered_htlc($opt_anchors) || *$weight == weight_offered_htlc($opt_anchors) { true } else { false },
 					amount_msat: 0,
 					cltv_expiry: 2 << 16,
@@ -7351,7 +7351,7 @@ mod tests {
 			SecretKey::from_slice(&[41; 32]).unwrap(),
 			[41; 32],
 			[0; 32],
-			[0; 32],
+			std::path::PathBuf::new(), [0; 32],
 		);
 
 		let counterparty_pubkeys = ChannelPublicKeys {

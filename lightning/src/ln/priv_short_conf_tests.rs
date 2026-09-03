@@ -62,7 +62,7 @@ fn test_priv_forwarding_rejection() {
 
 	// ... however, if we send to nodes[2], we will have to pass the private channel from nodes[1]
 	// to nodes[2], which should be rejected:
-	let route_hint = RouteHint(vec![RouteHintHop {
+	let route_hint = RouteHint(vec![RouteHintHop { htlc_maximum_rgb: None,
 		src_node_id: node_b_id,
 		short_channel_id: nodes[2].node.list_channels()[0].short_channel_id.unwrap(),
 		fees: RoutingFees { base_msat: 1000, proportional_millionths: 0 },
@@ -315,7 +315,7 @@ fn test_routed_scid_alias() {
 		create_unannounced_chan_between_nodes_with_value(&nodes, 1, 2, 1_000_000, 500_000_000).0;
 
 	let last_hop = nodes[2].node.list_usable_channels();
-	let hop_hints = vec![RouteHint(vec![RouteHintHop {
+	let hop_hints = vec![RouteHint(vec![RouteHintHop { htlc_maximum_rgb: None,
 		src_node_id: node_b_id,
 		short_channel_id: last_hop[0].inbound_scid_alias.unwrap(),
 		fees: RoutingFees {
@@ -390,7 +390,7 @@ fn test_scid_privacy_on_pub_channel() {
 	scid_privacy_cfg.channel_handshake_config.negotiate_scid_privacy = true;
 	nodes[0]
 		.node
-		.create_channel(node_b_id, 100000, 10001, 42, None, Some(scid_privacy_cfg))
+		.create_channel(node_b_id, 100000, 10001, 42, None, Some(scid_privacy_cfg), None)
 		.unwrap();
 	let mut open_channel = get_event_msg!(nodes[0], MessageSendEvent::SendOpenChannel, node_b_id);
 
@@ -419,7 +419,7 @@ fn test_scid_privacy_negotiation() {
 	scid_privacy_cfg.channel_handshake_config.negotiate_scid_privacy = true;
 	nodes[0]
 		.node
-		.create_channel(node_b_id, 100000, 10001, 42, None, Some(scid_privacy_cfg))
+		.create_channel(node_b_id, 100000, 10001, 42, None, Some(scid_privacy_cfg), None)
 		.unwrap();
 
 	let init_open_channel = get_event_msg!(nodes[0], MessageSendEvent::SendOpenChannel, node_b_id);
@@ -492,7 +492,7 @@ fn test_inbound_scid_privacy() {
 	no_announce_cfg.channel_handshake_config.negotiate_scid_privacy = true;
 	nodes[1]
 		.node
-		.create_channel(node_c_id, 100_000, 10_000, 42, None, Some(no_announce_cfg))
+		.create_channel(node_c_id, 100_000, 10_000, 42, None, Some(no_announce_cfg), None)
 		.unwrap();
 	let mut open_channel = get_event_msg!(nodes[1], MessageSendEvent::SendOpenChannel, node_c_id);
 
@@ -545,7 +545,7 @@ fn test_inbound_scid_privacy() {
 	// Now we can pay just fine using the SCID alias nodes[2] gave to nodes[1]...
 
 	let last_hop = nodes[2].node.list_usable_channels();
-	let mut hop_hints = vec![RouteHint(vec![RouteHintHop {
+	let mut hop_hints = vec![RouteHint(vec![RouteHintHop { htlc_maximum_rgb: None,
 		src_node_id: node_b_id,
 		short_channel_id: last_hop[0].inbound_scid_alias.unwrap(),
 		fees: RoutingFees {
@@ -656,7 +656,7 @@ fn test_scid_alias_returned() {
 	let chan = create_unannounced_chan_between_nodes_with_value(&nodes, 1, 2, 10_000, 0);
 
 	let last_hop = nodes[2].node.list_usable_channels();
-	let mut hop_hints = vec![RouteHint(vec![RouteHintHop {
+	let mut hop_hints = vec![RouteHint(vec![RouteHintHop { htlc_maximum_rgb: None,
 		src_node_id: node_b_id,
 		short_channel_id: last_hop[0].inbound_scid_alias.unwrap(),
 		fees: RoutingFees {
@@ -807,7 +807,7 @@ fn test_0conf_channel_with_async_monitor() {
 	create_announced_chan_between_nodes_with_value(&nodes, 1, 2, 1_000_000, 0);
 
 	chan_config.channel_handshake_config.announce_for_forwarding = false;
-	nodes[0].node.create_channel(node_b_id, 100000, 10001, 42, None, Some(chan_config)).unwrap();
+	nodes[0].node.create_channel(node_b_id, 100000, 10001, 42, None, Some(chan_config), None).unwrap();
 	let open_channel = get_event_msg!(nodes[0], MessageSendEvent::SendOpenChannel, node_b_id);
 
 	nodes[1].node.handle_open_channel(node_a_id, &open_channel);
@@ -1152,7 +1152,7 @@ fn test_zero_conf_accept_reject() {
 	let node_a_id = nodes[0].node.get_our_node_id();
 	let node_b_id = nodes[1].node.get_our_node_id();
 
-	nodes[0].node.create_channel(node_b_id, 100000, 10001, 42, None, None).unwrap();
+	nodes[0].node.create_channel(node_b_id, 100000, 10001, 42, None, None, None).unwrap();
 	let mut open_channel_msg =
 		get_event_msg!(nodes[0], MessageSendEvent::SendOpenChannel, node_b_id);
 
@@ -1186,7 +1186,7 @@ fn test_zero_conf_accept_reject() {
 	// 2.1 First try the non-0conf method to manually accept
 	nodes[0]
 		.node
-		.create_channel(node_b_id, 100000, 10001, 42, None, Some(manually_accept_conf.clone()))
+		.create_channel(node_b_id, 100000, 10001, 42, None, Some(manually_accept_conf.clone()), None)
 		.unwrap();
 	let mut open_channel_msg =
 		get_event_msg!(nodes[0], MessageSendEvent::SendOpenChannel, node_b_id);
@@ -1225,7 +1225,7 @@ fn test_zero_conf_accept_reject() {
 	// 2.2 Try again with the 0conf method to manually accept
 	nodes[0]
 		.node
-		.create_channel(node_b_id, 100000, 10001, 42, None, Some(manually_accept_conf))
+		.create_channel(node_b_id, 100000, 10001, 42, None, Some(manually_accept_conf), None)
 		.unwrap();
 	let mut open_channel_msg =
 		get_event_msg!(nodes[0], MessageSendEvent::SendOpenChannel, node_b_id);
@@ -1276,7 +1276,7 @@ fn test_connect_before_funding() {
 	let node_a_id = nodes[0].node.get_our_node_id();
 	let node_b_id = nodes[1].node.get_our_node_id();
 
-	nodes[0].node.create_channel(node_b_id, 100_000, 10_001, 42, None, None).unwrap();
+	nodes[0].node.create_channel(node_b_id, 100_000, 10_001, 42, None, None, None).unwrap();
 	let open_channel = get_event_msg!(nodes[0], MessageSendEvent::SendOpenChannel, node_b_id);
 
 	nodes[1].node.handle_open_channel(node_a_id, &open_channel);

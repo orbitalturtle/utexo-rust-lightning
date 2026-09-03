@@ -695,9 +695,9 @@ mod tests {
 		// adding an intermediate onion layer, causing the receiver to error with "final payload
 		// provided for us as an intermediate node."
 		let secp_ctx = Secp256k1::new();
-		let bob = crate::sign::KeysManager::new(&[2; 32], 42, 42, true);
+		let bob = crate::sign::KeysManager::new(&[2; 32], 42, 42, true, std::path::PathBuf::new());
 		let bob_pk = PublicKey::from_secret_key(&secp_ctx, &bob.get_node_secret_key());
-		let charlie = crate::sign::KeysManager::new(&[3; 32], 42, 42, true);
+		let charlie = crate::sign::KeysManager::new(&[3; 32], 42, 42, true, std::path::PathBuf::new());
 		let charlie_pk = PublicKey::from_secret_key(&secp_ctx, &charlie.get_node_secret_key());
 
 		let (
@@ -725,9 +725,9 @@ mod tests {
 		use super::*;
 		let secp_ctx = Secp256k1::new();
 
-		let bob = crate::sign::KeysManager::new(&[2; 32], 42, 42, true);
+		let bob = crate::sign::KeysManager::new(&[2; 32], 42, 42, true, std::path::PathBuf::new());
 		let bob_pk = PublicKey::from_secret_key(&secp_ctx, &bob.get_node_secret_key());
-		let charlie = crate::sign::KeysManager::new(&[3; 32], 42, 42, true);
+		let charlie = crate::sign::KeysManager::new(&[3; 32], 42, 42, true, std::path::PathBuf::new());
 		let charlie_pk = PublicKey::from_secret_key(&secp_ctx, &charlie.get_node_secret_key());
 
 		let (session_priv, total_amt_msat, cur_height, recipient_onion, preimage, payment_hash,
@@ -738,7 +738,7 @@ mod tests {
 			blinded_tail: None,
 		};
 
-		let (onion, amount_msat, cltv_expiry) = create_payment_onion(
+		let (onion, amount_msat, cltv_expiry, _) = create_payment_onion(
 			&secp_ctx, &path, &session_priv, total_amt_msat, &recipient_onion,
 			cur_height, &payment_hash, &Some(preimage), None, prng_seed
 		).unwrap();
@@ -777,7 +777,7 @@ mod tests {
 		amount_msat: u64, cltv_expiry: u32, payment_hash: PaymentHash,
 		onion_routing_packet: msgs::OnionPacket,
 	) -> msgs::UpdateAddHTLC {
-		msgs::UpdateAddHTLC {
+		msgs::UpdateAddHTLC { rgb_payment: None,
 			channel_id: ChannelId::from_bytes([0; 32]),
 			htlc_id: 0,
 			amount_msat,
@@ -811,7 +811,7 @@ mod tests {
 		let hop_fee = 1;
 		let recipient_amount = total_amt_msat - hop_fee;
 		let hops = vec![
-			RouteHop {
+			RouteHop { payment_amount: 0, rgb_payment: None,
 				pubkey: hop_pk,
 				fee_msat: hop_fee,
 				cltv_expiry_delta: MIN_CLTV_EXPIRY_DELTA as u32,
@@ -820,7 +820,7 @@ mod tests {
 				channel_features: ChannelFeatures::empty(),
 				maybe_announced_channel: false,
 			},
-			RouteHop {
+			RouteHop { payment_amount: 0, rgb_payment: None,
 				pubkey: recipient_pk,
 				fee_msat: recipient_amount,
 				cltv_expiry_delta: TEST_FINAL_CLTV,

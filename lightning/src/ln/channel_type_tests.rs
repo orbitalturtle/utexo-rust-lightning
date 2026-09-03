@@ -142,7 +142,7 @@ fn test_zero_conf_channel_type_support() {
 		42,
 		None,
 		&logger,
-	)
+	None, std::path::PathBuf::new(),)
 	.unwrap();
 
 	let mut channel_type_features = ChannelTypeFeatures::only_static_remote_key();
@@ -166,7 +166,7 @@ fn test_zero_conf_channel_type_support() {
 		0,
 		&&logger,
 		/*is_0conf=*/ false,
-	);
+	std::path::PathBuf::new(),);
 	assert!(res.is_ok());
 }
 
@@ -240,7 +240,7 @@ fn do_test_supports_channel_type(config: UserConfig, expected_channel_type: Chan
 		42,
 		None,
 		&logger,
-	)
+	None, std::path::PathBuf::new(),)
 	.unwrap();
 	assert_eq!(
 		channel_a.funding.get_channel_type(),
@@ -261,7 +261,7 @@ fn do_test_supports_channel_type(config: UserConfig, expected_channel_type: Chan
 		42,
 		None,
 		&logger,
-	)
+	None, std::path::PathBuf::new(),)
 	.unwrap();
 
 	let open_channel_msg =
@@ -279,7 +279,7 @@ fn do_test_supports_channel_type(config: UserConfig, expected_channel_type: Chan
 		0,
 		&&logger,
 		/*is_0conf=*/ false,
-	)
+	std::path::PathBuf::new(),)
 	.unwrap();
 
 	assert_eq!(channel_a.funding.get_channel_type(), &expected_channel_type);
@@ -326,7 +326,7 @@ fn test_rejects_if_channel_type_not_set() {
 		42,
 		None,
 		&logger,
-	)
+	None, std::path::PathBuf::new(),)
 	.unwrap();
 
 	// Set `channel_type` to `None` to cause failure.
@@ -347,7 +347,7 @@ fn test_rejects_if_channel_type_not_set() {
 		0,
 		&&logger,
 		/*is_0conf=*/ false,
-	);
+	std::path::PathBuf::new(),);
 	assert!(channel_b.is_err());
 
 	open_channel_msg.common_fields.channel_type =
@@ -365,7 +365,7 @@ fn test_rejects_if_channel_type_not_set() {
 		0,
 		&&logger,
 		/*is_0conf=*/ false,
-	)
+	std::path::PathBuf::new(),)
 	.unwrap();
 
 	// Set `channel_type` to `None` in `accept_channel` to cause failure.
@@ -412,7 +412,7 @@ fn test_rejects_if_channel_type_differ() {
 		42,
 		None,
 		&logger,
-	)
+	None, std::path::PathBuf::new(),)
 	.unwrap();
 
 	let open_channel_msg =
@@ -431,7 +431,7 @@ fn test_rejects_if_channel_type_differ() {
 		0,
 		&&logger,
 		/*is_0conf=*/ false,
-	)
+	std::path::PathBuf::new(),)
 	.unwrap();
 
 	// Change the `channel_type` in `accept_channel` msg to make it different from the one set in
@@ -495,7 +495,7 @@ fn test_rejects_simple_anchors_channel_type() {
 		42,
 		None,
 		&logger,
-	)
+	None, std::path::PathBuf::new(),)
 	.unwrap();
 
 	let mut open_channel_msg =
@@ -515,7 +515,7 @@ fn test_rejects_simple_anchors_channel_type() {
 		0,
 		&&logger,
 		/*is_0conf=*/ false,
-	);
+	std::path::PathBuf::new(),);
 	assert!(res.is_err());
 
 	// Then, we'll try to open another channel where A requests a channel type for
@@ -536,7 +536,7 @@ fn test_rejects_simple_anchors_channel_type() {
 		42,
 		None,
 		&logger,
-	)
+	None, std::path::PathBuf::new(),)
 	.unwrap();
 
 	let open_channel_msg =
@@ -555,7 +555,7 @@ fn test_rejects_simple_anchors_channel_type() {
 		0,
 		&&logger,
 		/*is_0conf=*/ false,
-	)
+	std::path::PathBuf::new(),)
 	.unwrap();
 
 	let mut accept_channel_msg = channel_b.get_accept_channel_message(&&logger).unwrap();

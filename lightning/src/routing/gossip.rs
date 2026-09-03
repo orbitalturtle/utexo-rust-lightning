@@ -2746,7 +2746,6 @@ impl ReadOnlyNetworkGraph<'_> {
 	}
 }
 
-/*
 #[cfg(test)]
 pub(crate) mod tests {
 	use crate::ln::chan_utils::make_funding_redeemscript;
@@ -2854,7 +2853,7 @@ pub(crate) mod tests {
 		let node_1_btckey = &SecretKey::from_slice(&[40; 32]).unwrap();
 		let node_2_btckey = &SecretKey::from_slice(&[39; 32]).unwrap();
 
-		let mut unsigned_announcement = UnsignedChannelAnnouncement {
+		let mut unsigned_announcement = UnsignedChannelAnnouncement { contract_id: None,
 			features: channelmanager::provided_channel_features(&UserConfig::default()),
 			chain_hash: ChainHash::using_genesis_block(Network::Testnet),
 			short_channel_id: 0,
@@ -2894,7 +2893,7 @@ pub(crate) mod tests {
 	pub(crate) fn get_signed_channel_update<F: Fn(&mut UnsignedChannelUpdate)>(
 		f: F, node_key: &SecretKey, secp_ctx: &Secp256k1<secp256k1::All>,
 	) -> ChannelUpdate {
-		let mut unsigned_channel_update = UnsignedChannelUpdate {
+		let mut unsigned_channel_update = UnsignedChannelUpdate { htlc_maximum_rgb: 0,
 			chain_hash: ChainHash::using_genesis_block(Network::Testnet),
 			short_channel_id: 0,
 			timestamp: 100,
@@ -4232,7 +4231,7 @@ pub(crate) mod tests {
 		let config = crate::ln::functional_test_utils::test_default_channel_config();
 
 		// 1. Test encoding/decoding of ChannelUpdateInfo
-		let chan_update_info = ChannelUpdateInfo {
+		let chan_update_info = ChannelUpdateInfo { htlc_maximum_rgb: 0,
 			last_update: 23,
 			enabled: true,
 			cltv_expiry_delta: 42,
@@ -4270,7 +4269,7 @@ pub(crate) mod tests {
 
 		// 2. Test encoding/decoding of ChannelInfo
 		// Check we can encode/decode ChannelInfo without ChannelUpdateInfo fields present.
-		let chan_info_none_updates = ChannelInfo {
+		let chan_info_none_updates = ChannelInfo { contract_id: None,
 			features: channelmanager::provided_channel_features(&config),
 			node_one: NodeId::from_pubkey(&nodes[0].node.get_our_node_id()),
 			one_to_two: None,
@@ -4291,7 +4290,7 @@ pub(crate) mod tests {
 		assert_eq!(chan_info_none_updates, read_chan_info);
 
 		// Check we can encode/decode ChannelInfo with ChannelUpdateInfo fields present.
-		let chan_info_some_updates = ChannelInfo {
+		let chan_info_some_updates = ChannelInfo { contract_id: None,
 			features: channelmanager::provided_channel_features(&config),
 			node_one: NodeId::from_pubkey(&nodes[0].node.get_our_node_id()),
 			one_to_two: Some(chan_update_info.clone()),
@@ -4536,4 +4535,3 @@ pub mod benches {
 		bench.bench_function("write_network_graph", |b| b.iter(|| black_box(&net_graph).encode()));
 	}
 }
-*/

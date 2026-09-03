@@ -207,7 +207,7 @@ use crate::ln::script::ShutdownScript;
 /// `funding_signed` messages (sending an `ErrorMessage` instead) in its
 /// `internal_funding_created` handler.
 #[cfg(any(test, feature = "_rln_test_hooks"))]
-pub static DROP_FUNDING_SIGNED_ON_NODE: Mutex<Option<PublicKey>> = Mutex::new(None);
+pub static DROP_FUNDING_SIGNED_ON_NODE: std::sync::Mutex<Option<PublicKey>> = std::sync::Mutex::new(None);
 
 // We hold various information about HTLC relay in the HTLC objects in Channel itself:
 //
@@ -18670,13 +18670,12 @@ where
 	}
 }
 
-/*
 #[cfg(test)]
 mod tests {
 	use crate::events::{ClosureReason, Event, HTLCHandlingFailureType};
 	use crate::ln::channelmanager::{
-		create_recv_pending_htlc_info, inbound_payment, HTLCForwardInfo, InterceptId, PaymentId,
-		RecipientOnionFields,
+		create_recv_pending_htlc_info, inbound_payment, HTLCForwardInfo, InterceptId,
+		NextHopForward, PaymentId, RecipientOnionFields,
 	};
 	use crate::ln::functional_test_utils::*;
 	use crate::ln::msgs::{self, BaseMessageHandler, ChannelMessageHandler, MessageSendEvent};
@@ -18924,7 +18923,7 @@ mod tests {
 		// Next, attempt a keysend payment and make sure it fails.
 		let route_params = RouteParameters::from_payment_params_and_value(
 			PaymentParameters::for_keysend(expected_route.last().unwrap().node.get_our_node_id(),
-			TEST_FINAL_CLTV, false), 100_000);
+			TEST_FINAL_CLTV, false), 100_000, None);
 		nodes[0].node.send_spontaneous_payment(
 			Some(payment_preimage), RecipientOnionFields::spontaneous_empty(),
 			PaymentId(payment_preimage.0), route_params.clone(), Retry::Attempts(0)
@@ -19021,7 +19020,7 @@ mod tests {
 		let route_params = RouteParameters::from_payment_params_and_value(
 			PaymentParameters::for_keysend(expected_route.last().unwrap().node.get_our_node_id(), TEST_FINAL_CLTV, false),
 			100_000
-		);
+		, None);
 		let payment_id_2 = PaymentId([45; 32]);
 		nodes[0].node.send_spontaneous_payment(
 			Some(payment_preimage), RecipientOnionFields::spontaneous_empty(), payment_id_2, route_params,
@@ -19069,7 +19068,7 @@ mod tests {
 
 		let _chan = create_chan_between_nodes(&nodes[0], &nodes[1]);
 		let route_params = RouteParameters::from_payment_params_and_value(
-			PaymentParameters::for_keysend(payee_pubkey, 40, false), 10_000);
+			PaymentParameters::for_keysend(payee_pubkey, 40, false), 10_000, None);
 		let network_graph = nodes[0].network_graph;
 		let first_hops = nodes[0].node.list_usable_channels();
 		let scorer = test_utils::TestScorer::new();
@@ -19349,7 +19348,7 @@ mod tests {
 		let error_message = "Channel force-closed";
 
 		// Test the API functions.
-		check_not_connected_to_peer_error(nodes[0].node.create_channel(unkown_public_key, 1_000_000, 500_000_000, 42, None, None), unkown_public_key);
+		check_not_connected_to_peer_error(nodes[0].node.create_channel(unkown_public_key, 1_000_000, 500_000_000, 42, None, None, None), unkown_public_key);
 
 		check_unkown_peer_error(nodes[0].node.accept_inbound_channel(&channel_id, &unkown_public_key, 42, None), unkown_public_key);
 
@@ -19357,7 +19356,7 @@ mod tests {
 
 		check_unkown_peer_error(nodes[0].node.force_close_broadcasting_latest_txn(&channel_id, &unkown_public_key, error_message.to_string()), unkown_public_key);
 
-		check_unkown_peer_error(nodes[0].node.forward_intercepted_htlc(intercept_id, &channel_id, unkown_public_key, 1_000_000), unkown_public_key);
+		check_unkown_peer_error(nodes[0].node.forward_intercepted_htlc(intercept_id, NextHopForward::ChannelId(unkown_public_key, &channel_id), unkown_public_key, 1_000_000, None), unkown_public_key);
 
 		check_unkown_peer_error(nodes[0].node.update_channel_config(&unkown_public_key, &[channel_id], &ChannelConfig::default()), unkown_public_key);
 	}
@@ -19387,7 +19386,7 @@ mod tests {
 
 		check_channel_unavailable_error(nodes[0].node.force_close_broadcasting_latest_txn(&channel_id, &counterparty_node_id, error_message.to_string()), channel_id, counterparty_node_id);
 
-		check_channel_unavailable_error(nodes[0].node.forward_intercepted_htlc(InterceptId([0; 32]), &channel_id, counterparty_node_id, 1_000_000), channel_id, counterparty_node_id);
+		check_channel_unavailable_error(nodes[0].node.forward_intercepted_htlc(InterceptId([0; 32]), NextHopForward::ChannelId(counterparty_node_id, &channel_id), counterparty_node_id, 1_000_000, None), channel_id, counterparty_node_id);
 
 		check_channel_unavailable_error(nodes[0].node.update_channel_config(&counterparty_node_id, &[channel_id], &ChannelConfig::default()), channel_id, counterparty_node_id);
 	}
@@ -19403,7 +19402,7 @@ mod tests {
 
 		// Note that create_network connects the nodes together for us
 
-		nodes[0].node.create_channel(nodes[1].node.get_our_node_id(), 100_000, 0, 42, None, None).unwrap();
+		nodes[0].node.create_channel(nodes[1].node.get_our_node_id(), 100_000, 0, 42, None, None, None).unwrap();
 		let mut open_channel_msg = get_event_msg!(nodes[0], MessageSendEvent::SendOpenChannel, nodes[1].node.get_our_node_id());
 
 		let mut funding_tx = None;
@@ -19491,7 +19490,7 @@ mod tests {
 			open_channel_msg.common_fields.temporary_channel_id);
 
 		// Of course, however, outbound channels are always allowed
-		nodes[1].node.create_channel(last_random_pk, 100_000, 0, 42, None, None).unwrap();
+		nodes[1].node.create_channel(last_random_pk, 100_000, 0, 42, None, None, None).unwrap();
 		get_event_msg!(nodes[1], MessageSendEvent::SendOpenChannel, last_random_pk);
 
 		// If we fund the first channel, nodes[0] has a live on-chain channel with us, it is now
@@ -19518,7 +19517,7 @@ mod tests {
 		let sender_intended_amt_msat = 100;
 		let extra_fee_msat = 10;
 		let hop_data = onion_utils::Hop::Receive {
-			hop_data: msgs::InboundOnionReceivePayload {
+			hop_data: msgs::InboundOnionReceivePayload { rgb_payment_to_forward: None,
 				sender_intended_htlc_amt_msat: 100,
 				cltv_expiry_height: 42,
 				payment_metadata: None,
@@ -19537,14 +19536,14 @@ mod tests {
 		if let Err(crate::ln::channelmanager::InboundHTLCErr { reason, .. }) =
 			create_recv_pending_htlc_info(hop_data, [0; 32], PaymentHash([0; 32]),
 				sender_intended_amt_msat - extra_fee_msat - 1, 42, None, true, Some(extra_fee_msat),
-				current_height)
+				current_height, None)
 		{
 			assert_eq!(reason, LocalHTLCFailureReason::FinalIncorrectHTLCAmount);
 		} else { panic!(); }
 
 		// If amt_received + extra_fee is equal to the sender intended amount, we're fine.
 		let hop_data = onion_utils::Hop::Receive {
-			hop_data: msgs::InboundOnionReceivePayload { // This is the same payload as above, InboundOnionPayload doesn't implement Clone
+			hop_data: msgs::InboundOnionReceivePayload { rgb_payment_to_forward: None, // This is the same payload as above, InboundOnionPayload doesn't implement Clone
 				sender_intended_htlc_amt_msat: 100,
 				cltv_expiry_height: 42,
 				payment_metadata: None,
@@ -19560,7 +19559,7 @@ mod tests {
 		let current_height: u32 = node[0].node.best_block.read().unwrap().height;
 		assert!(create_recv_pending_htlc_info(hop_data, [0; 32], PaymentHash([0; 32]),
 			sender_intended_amt_msat - extra_fee_msat, 42, None, true, Some(extra_fee_msat),
-			current_height).is_ok());
+			current_height, None).is_ok());
 	}
 
 	#[test]
@@ -19573,7 +19572,7 @@ mod tests {
 
 		let current_height: u32 = node[0].node.best_block.read().unwrap().height;
 		let result = create_recv_pending_htlc_info(onion_utils::Hop::Receive {
-			hop_data: msgs::InboundOnionReceivePayload {
+			hop_data: msgs::InboundOnionReceivePayload { rgb_payment_to_forward: None,
 				sender_intended_htlc_amt_msat: 100,
 				cltv_expiry_height: TEST_FINAL_CLTV,
 				payment_metadata: None,
@@ -19585,7 +19584,7 @@ mod tests {
 				custom_tlvs: Vec::new(),
 			},
 			shared_secret: SharedSecret::from_bytes([0; 32]),
-		}, [0; 32], PaymentHash([0; 32]), 100, TEST_FINAL_CLTV + 1, None, true, None, current_height);
+		}, [0; 32], PaymentHash([0; 32]), 100, TEST_FINAL_CLTV + 1, None, true, None, current_height, None);
 
 		// Should not return an error as this condition:
 		// https://github.com/lightning/bolts/blob/4dcc377209509b13cf89a4b91fde7d478f5b46d8/04-onion-routing.md?plain=1#L334
@@ -20047,4 +20046,3 @@ pub mod bench {
 		}));
 	}
 }
-*/

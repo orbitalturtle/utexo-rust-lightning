@@ -4427,7 +4427,6 @@ impl_writeable_msg!(GossipTimestampFilter, {
 	timestamp_range,
 }, {});
 
-/*
 #[cfg(test)]
 mod tests {
 	use crate::ln::msgs::SocketAddress;
@@ -4707,7 +4706,7 @@ mod tests {
 		if unknown_features_bits {
 			features = ChannelFeatures::from_le_bytes(vec![0xFF, 0xFF]);
 		}
-		let unsigned_channel_announcement = msgs::UnsignedChannelAnnouncement {
+		let unsigned_channel_announcement = msgs::UnsignedChannelAnnouncement { contract_id: None,
 			features,
 			chain_hash: ChainHash::using_genesis_block(Network::Bitcoin),
 			short_channel_id: 2316138423780173,
@@ -4904,7 +4903,7 @@ mod tests {
 		);
 		let sig_1 =
 			get_sig_on!(privkey_1, secp_ctx, String::from("01010101010101010101010101010101"));
-		let unsigned_channel_update = msgs::UnsignedChannelUpdate {
+		let unsigned_channel_update = msgs::UnsignedChannelUpdate { htlc_maximum_rgb: 0,
 			chain_hash: ChainHash::using_genesis_block(Network::Bitcoin),
 			short_channel_id: 2316138423780173,
 			timestamp: 20190119,
@@ -4985,7 +4984,7 @@ mod tests {
 			"0606060606060606060606060606060606060606060606060606060606060606",
 			secp_ctx
 		);
-		let open_channel = msgs::OpenChannel {
+		let open_channel = msgs::OpenChannel { rgb_asset: None,
 			common_fields: CommonOpenChannelFields {
 				chain_hash: ChainHash::using_genesis_block(Network::Bitcoin),
 				temporary_channel_id: ChannelId::from_bytes([2; 32]),
@@ -5265,7 +5264,7 @@ mod tests {
 			"0606060606060606060606060606060606060606060606060606060606060606",
 			secp_ctx
 		);
-		let accept_channel = msgs::AcceptChannel {
+		let accept_channel = msgs::AcceptChannel { known_asset: false,
 			common_fields: CommonAcceptChannelFields {
 				temporary_channel_id: ChannelId::from_bytes([2; 32]),
 				dust_limit_satoshis: 1311768467284833366,
@@ -5934,7 +5933,7 @@ mod tests {
 			hop_data: [1; 20 * 65],
 			hmac: [2; 32],
 		};
-		let update_add_htlc = msgs::UpdateAddHTLC {
+		let update_add_htlc = msgs::UpdateAddHTLC { rgb_payment: None,
 			channel_id: ChannelId::from_bytes([2; 32]),
 			htlc_id: 2316138423780173,
 			amount_msat: 3608586615801332854,
@@ -6192,7 +6191,7 @@ mod tests {
 
 	#[test]
 	fn encoding_nonfinal_onion_hop_data() {
-		let outbound_msg = msgs::OutboundOnionPayload::Forward {
+		let outbound_msg = msgs::OutboundOnionPayload::Forward { rgb_payment_to_forward: None,
 			short_channel_id: 0xdeadbeef1bad1dea,
 			amt_to_forward: 0x0badf00d01020304,
 			outgoing_cltv_value: 0xffffffff,
@@ -6209,7 +6208,7 @@ mod tests {
 			short_channel_id,
 			amt_to_forward,
 			outgoing_cltv_value,
-		}) = inbound_msg
+		 ..}) = inbound_msg
 		{
 			assert_eq!(short_channel_id, 0xdeadbeef1bad1dea);
 			assert_eq!(amt_to_forward, 0x0badf00d01020304);
@@ -6221,7 +6220,7 @@ mod tests {
 
 	#[test]
 	fn encoding_final_onion_hop_data() {
-		let outbound_msg = msgs::OutboundOnionPayload::Receive {
+		let outbound_msg = msgs::OutboundOnionPayload::Receive { rgb_payment_to_forward: None,
 			payment_data: None,
 			payment_metadata: None,
 			keysend_preimage: None,
@@ -6253,7 +6252,7 @@ mod tests {
 	#[test]
 	fn encoding_final_onion_hop_data_with_secret() {
 		let expected_payment_secret = PaymentSecret([0x42u8; 32]);
-		let outbound_msg = msgs::OutboundOnionPayload::Receive {
+		let outbound_msg = msgs::OutboundOnionPayload::Receive { rgb_payment_to_forward: None,
 			payment_data: Some(FinalOnionHopData {
 				payment_secret: expected_payment_secret,
 				total_msat: 0x1badca1f,
@@ -6278,7 +6277,7 @@ mod tests {
 			payment_metadata: None,
 			keysend_preimage: None,
 			custom_tlvs,
-		}) = inbound_msg
+		 ..}) = inbound_msg
 		{
 			assert_eq!(payment_secret, expected_payment_secret);
 			assert_eq!(sender_intended_htlc_amt_msat, 0x0badf00d01020304);
@@ -6294,7 +6293,7 @@ mod tests {
 		// If custom TLVs have type number within the range reserved for protocol, treat them as if
 		// they're unknown
 		let bad_type_range_tlvs = vec![((1 << 16) - 4, vec![42]), ((1 << 16) - 2, vec![42; 32])];
-		let mut msg = msgs::OutboundOnionPayload::Receive {
+		let mut msg = msgs::OutboundOnionPayload::Receive { rgb_payment_to_forward: None,
 			payment_data: None,
 			payment_metadata: None,
 			keysend_preimage: None,
@@ -6328,7 +6327,7 @@ mod tests {
 	fn encoding_final_onion_hop_data_with_custom_tlvs() {
 		let expected_custom_tlvs =
 			vec![(5482373483, vec![0x12, 0x34]), (5482373487, vec![0x42u8; 8])];
-		let msg = msgs::OutboundOnionPayload::Receive {
+		let msg = msgs::OutboundOnionPayload::Receive { rgb_payment_to_forward: None,
 			payment_data: None,
 			payment_metadata: None,
 			keysend_preimage: None,
@@ -6686,7 +6685,7 @@ mod tests {
 	// see above test, needs to be a separate method for use of the serialization macros.
 	fn encode_big_payload() -> Result<Vec<u8>, io::Error> {
 		use crate::util::ser::HighZeroBytesDroppedBigSize;
-		let payload = msgs::OutboundOnionPayload::Forward {
+		let payload = msgs::OutboundOnionPayload::Forward { rgb_payment_to_forward: None,
 			short_channel_id: 0xdeadbeef1bad1dea,
 			amt_to_forward: 1000,
 			outgoing_cltv_value: 0xffffffff,
@@ -6697,7 +6696,7 @@ mod tests {
 			short_channel_id,
 			amt_to_forward,
 			outgoing_cltv_value,
-		} = payload
+		 ..} = payload
 		{
 			_encode_varint_length_prefixed_tlv!(&mut encoded_payload, {
 				(1, &test_bytes, required_vec),
@@ -6832,4 +6831,3 @@ mod tests {
 		.is_err());
 	}
 }
-*/
