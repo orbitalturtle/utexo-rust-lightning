@@ -809,17 +809,19 @@ pub fn do_test_fee_spike_buffer(cfg: Option<UserConfig>, htlc_fails: bool) {
 	let chan =
 		create_announced_chan_between_nodes_with_value(&nodes, 0, 1, chan_amt_sat, push_amt_msat);
 
+	// The route is only used to get a valid path structure (pubkeys/scid/cltv); the actual HTLC
+	// amount below is set directly and bypasses the router entirely, so this request just needs
+	// to be routable at all, independent of the (much larger) amount the test actually exercises.
 	let (mut route, payment_hash, _, payment_secret) =
-		get_route_and_payment_hash!(nodes[0], nodes[1], 3460000);
-	route.paths[0].hops[0].fee_msat += 1;
-	route.paths[0].hops[0].payment_amount = route.paths[0].hops[0].fee_msat;
+		get_route_and_payment_hash!(nodes[0], nodes[1], 1_000);
+	let payment_amt_msat = 3460001;
+	route.paths[0].hops[0].fee_msat = payment_amt_msat;
+	route.paths[0].hops[0].payment_amount = payment_amt_msat;
 	// Need to manually create the update_add_htlc message to go around the channel reserve check in send_htlc()
 	let secp_ctx = Secp256k1::new();
 	let session_priv = SecretKey::from_slice(&[42; 32]).expect("RNG is bad!");
 
 	let cur_height = nodes[1].node.best_block.read().unwrap().height + 1;
-
-	let payment_amt_msat = 3460001;
 	let onion_keys = onion_utils::construct_onion_keys(&secp_ctx, &route.paths[0], &session_priv);
 	let recipient_onion_fields = RecipientOnionFields::secret_only(payment_secret);
 	let (onion_payloads, htlc_msat, htlc_cltv, _) = onion_utils::build_onion_payloads(
