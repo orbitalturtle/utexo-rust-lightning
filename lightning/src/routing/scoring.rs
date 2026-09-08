@@ -2714,7 +2714,7 @@ mod tests {
 		let node_1_secret = &SecretKey::from_slice(&[39; 32]).unwrap();
 		let node_2_secret = &SecretKey::from_slice(&[40; 32]).unwrap();
 		let secp_ctx = Secp256k1::new();
-		let unsigned_announcement = UnsignedChannelAnnouncement {
+		let unsigned_announcement = UnsignedChannelAnnouncement { contract_id: None,
 			features: channelmanager::provided_channel_features(&UserConfig::default()),
 			chain_hash: genesis_hash,
 			short_channel_id,
@@ -2745,7 +2745,7 @@ mod tests {
 	) {
 		let genesis_hash = ChainHash::using_genesis_block(Network::Testnet);
 		let secp_ctx = Secp256k1::new();
-		let unsigned_update = UnsignedChannelUpdate {
+		let unsigned_update = UnsignedChannelUpdate { htlc_maximum_rgb: 0,
 			chain_hash: genesis_hash,
 			short_channel_id,
 			timestamp,
@@ -2768,7 +2768,7 @@ mod tests {
 
 	fn path_hop(pubkey: PublicKey, short_channel_id: u64, fee_msat: u64) -> RouteHop {
 		let config = UserConfig::default();
-		RouteHop {
+		RouteHop { payment_amount: 0,
 			pubkey,
 			node_features: channelmanager::provided_node_features(&config),
 			short_channel_id,

@@ -1356,7 +1356,7 @@ mod tests {
 				),
 			]),
 		};
-		let signer = KeysManager::new(&[42; 32], 42, 42, true);
+		let signer = KeysManager::new(&[42; 32], 42, 42, true, std::path::PathBuf::new());
 		let logger = TestLogger::new();
 		let handler = BumpTransactionEventHandlerSync::new(&broadcaster, &source, &signer, &logger);
 

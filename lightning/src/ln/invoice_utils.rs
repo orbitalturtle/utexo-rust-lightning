@@ -1070,7 +1070,7 @@ mod test {
 		private_chan_cfg.channel_handshake_config.announce_for_forwarding = false;
 		let temporary_channel_id = nodes[2]
 			.node
-			.create_channel(node_a_id, 1_000_000, 500_000_000, 42, None, Some(private_chan_cfg))
+			.create_channel(node_a_id, 1_000_000, 500_000_000, 42, None, Some(private_chan_cfg), None)
 			.unwrap();
 		let open_channel = get_event_msg!(nodes[2], MessageSendEvent::SendOpenChannel, node_a_id);
 		nodes[0].node.handle_open_channel(node_c_id, &open_channel);
@@ -1213,7 +1213,7 @@ mod test {
 
 	fn make_dyn_keys_interface(seed: &[u8; 32]) -> DynKeysInterface {
 		let cross_node_seed = [44u8; 32];
-		let inner = PhantomKeysManager::new(&seed, 43, 44, &cross_node_seed, true);
+		let inner = PhantomKeysManager::new(&seed, 43, 44, &cross_node_seed, true, std::path::PathBuf::new());
 		let dyn_inner = DynPhantomKeysInterface::new(inner);
 		DynKeysInterface::new(Box::new(dyn_inner))
 	}
@@ -1300,7 +1300,7 @@ mod test {
 		let params = RouteParameters::from_payment_params_and_value(
 			payment_params,
 			invoice.amount_milli_satoshis().unwrap(),
-		);
+		None);
 
 		let payment_hash = PaymentHash(invoice.payment_hash().to_byte_array());
 		let id = PaymentId(payment_hash.0);
@@ -1600,7 +1600,7 @@ mod test {
 		private_chan_cfg.channel_handshake_config.announce_for_forwarding = false;
 		let temporary_channel_id = nodes[1]
 			.node
-			.create_channel(node_d_id, 1_000_000, 500_000_000, 42, None, Some(private_chan_cfg))
+			.create_channel(node_d_id, 1_000_000, 500_000_000, 42, None, Some(private_chan_cfg), None)
 			.unwrap();
 		let open_channel = get_event_msg!(nodes[1], MessageSendEvent::SendOpenChannel, node_d_id);
 		nodes[3].node.handle_open_channel(nodes[1].node.get_our_node_id(), &open_channel);

@@ -1304,7 +1304,7 @@ mod tests {
 			SecretKey::from_slice(&[41; 32]).unwrap(),
 			[41; 32],
 			[0; 32],
-			[0; 32],
+			std::path::PathBuf::new(), [0; 32],
 		);
 		let counterparty_pubkeys = ChannelPublicKeys {
 			funding_pubkey: PublicKey::from_secret_key(
@@ -1353,7 +1353,7 @@ mod tests {
 			let preimage = PaymentPreimage([i; 32]);
 			let hash = PaymentHash(Sha256::hash(&preimage.0[..]).to_byte_array());
 			nondust_htlcs.push(
-				HTLCOutputInCommitment {
+				HTLCOutputInCommitment { rgb_payment: None,
 					offered: true,
 					amount_msat: 10000,
 					cltv_expiry: i as u32,

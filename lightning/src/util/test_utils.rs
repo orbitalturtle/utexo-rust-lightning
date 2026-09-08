@@ -7,7 +7,6 @@
 // You may not use this file except in accordance with one or both of these
 // licenses.
 
-/*
 use crate::blinded_path::message::MessageContext;
 use crate::blinded_path::message::{BlindedMessagePath, MessageForwardNode};
 use crate::blinded_path::payment::{BlindedPaymentPath, ReceiveTlvs};
@@ -251,7 +250,7 @@ impl<'a> Router for TestRouter<'a> {
 								scorer.channel_penalty_msat(&candidate, usage, &Default::default());
 							} else {
 								let target_node_id = NodeId::from_pubkey(&hop.pubkey);
-								let route_hint = RouteHintHop {
+								let route_hint = RouteHintHop { htlc_maximum_rgb: None,
 									src_node_id: *prev_hop_node,
 									short_channel_id: hop.short_channel_id,
 									fees: RoutingFees { base_msat: 0, proportional_millionths: 0 },
@@ -1449,7 +1448,7 @@ fn get_dummy_channel_announcement(short_chan_id: u64) -> msgs::ChannelAnnounceme
 	let node_2_privkey = SecretKey::from_slice(&[41; 32]).unwrap();
 	let node_1_btckey = SecretKey::from_slice(&[40; 32]).unwrap();
 	let node_2_btckey = SecretKey::from_slice(&[39; 32]).unwrap();
-	let unsigned_ann = msgs::UnsignedChannelAnnouncement {
+	let unsigned_ann = msgs::UnsignedChannelAnnouncement { contract_id: None,
 		features: ChannelFeatures::empty(),
 		chain_hash: ChainHash::using_genesis_block(network),
 		short_channel_id: short_chan_id,
@@ -1476,7 +1475,7 @@ pub fn get_dummy_channel_update(short_chan_id: u64) -> msgs::ChannelUpdate {
 	let network = Network::Testnet;
 	msgs::ChannelUpdate {
 		signature: Signature::from(unsafe { FFISignature::new() }),
-		contents: msgs::UnsignedChannelUpdate {
+		contents: msgs::UnsignedChannelUpdate { htlc_maximum_rgb: 0,
 			chain_hash: ChainHash::using_genesis_block(network),
 			short_channel_id: short_chan_id,
 			timestamp: 0,
@@ -1941,7 +1940,7 @@ impl TestSignerFactory for DefaultSignerFactory {
 			now.subsec_nanos(),
 			seed,
 			v2_remote_key_derivation,
-		);
+		std::path::PathBuf::new(),);
 		let dphantom = DynPhantomKeysInterface::new(phantom);
 		let backing = Box::new(dphantom) as Box<dyn DynKeysInterfaceTrait<EcdsaSigner = DynSigner>>;
 		backing
@@ -2261,4 +2260,3 @@ impl WalletSourceSync for TestWalletSource {
 		self.sign_tx(tx).map_err(|_| ())
 	}
 }
-*/

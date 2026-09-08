@@ -339,7 +339,7 @@ impl msgs::ChannelUpdate {
 		use bitcoin::secp256k1::ffi::Signature as FFISignature;
 		msgs::ChannelUpdate {
 			signature: Signature::from(unsafe { FFISignature::new() }),
-			contents: msgs::UnsignedChannelUpdate {
+			contents: msgs::UnsignedChannelUpdate { htlc_maximum_rgb: 0,
 				chain_hash: ChainHash::from(BlockHash::hash(&vec![0u8][..]).as_ref()),
 				short_channel_id,
 				timestamp: 0,
@@ -523,7 +523,7 @@ fn test_onion_failure() {
 				construct_onion_keys(&Secp256k1::new(), &route.paths[0], &session_priv);
 			let recipient_fields = RecipientOnionFields::spontaneous_empty();
 			let path = &route.paths[0];
-			let (mut onion_payloads, _htlc_msat, _htlc_cltv) =
+			let (mut onion_payloads, _htlc_msat, _htlc_cltv, _) =
 				build_onion_payloads(path, 40000, &recipient_fields, cur_height, &None, None, None)
 					.unwrap();
 			let mut new_payloads = Vec::new();
@@ -565,7 +565,7 @@ fn test_onion_failure() {
 				construct_onion_keys(&Secp256k1::new(), &route.paths[0], &session_priv);
 			let recipient_fields = RecipientOnionFields::spontaneous_empty();
 			let path = &route.paths[0];
-			let (mut onion_payloads, _htlc_msat, _htlc_cltv) =
+			let (mut onion_payloads, _htlc_msat, _htlc_cltv, _) =
 				build_onion_payloads(path, 40000, &recipient_fields, cur_height, &None, None, None)
 					.unwrap();
 			let mut new_payloads = Vec::new();
@@ -1033,6 +1033,7 @@ fn test_onion_failure() {
 	let mut bogus_route = route.clone();
 	let route_len = bogus_route.paths[0].hops.len();
 	bogus_route.paths[0].hops[route_len - 1].fee_msat = amt_to_forward;
+	for hop in bogus_route.paths[0].hops.iter_mut() { hop.payment_amount = amt_to_forward; }
 	run_onion_failure_test(
 		"amount_below_minimum",
 		100,
@@ -1056,6 +1057,7 @@ fn test_onion_failure() {
 
 	// Test a positive test-case with one extra msat, meeting the minimum.
 	bogus_route.paths[0].hops[route_len - 1].fee_msat = amt_to_forward + 1;
+	for hop in bogus_route.paths[0].hops.iter_mut() { hop.payment_amount = amt_to_forward + 1; }
 	let preimage =
 		send_along_route(&nodes[0], bogus_route, &[&nodes[1], &nodes[2]], amt_to_forward + 1).0;
 	claim_payment(&nodes[0], &[&nodes[1], &nodes[2]], preimage);
@@ -1284,7 +1286,7 @@ fn test_onion_failure() {
 				construct_onion_keys(&Secp256k1::new(), &route.paths[0], &session_priv);
 			let recipient_fields = RecipientOnionFields::spontaneous_empty();
 			let path = &route.paths[0];
-			let (onion_payloads, _, htlc_cltv) =
+			let (onion_payloads, _, htlc_cltv, _) =
 				build_onion_payloads(path, 40000, &recipient_fields, height, &None, None, None)
 					.unwrap();
 			let onion_packet = onion_utils::construct_onion_packet(
@@ -1610,7 +1612,7 @@ fn do_test_onion_failure_stale_channel_update(announce_for_forwarding: bool) {
 	let (route, payment_hash, payment_preimage, payment_secret) = if announce_for_forwarding {
 		get_route_and_payment_hash!(nodes[0], nodes[2], PAYMENT_AMT)
 	} else {
-		let hop_hints = vec![RouteHint(vec![RouteHintHop {
+		let hop_hints = vec![RouteHint(vec![RouteHintHop { htlc_maximum_rgb: None,
 			src_node_id: nodes[1].node.get_our_node_id(),
 			short_channel_id: channel_to_update.1,
 			fees: RoutingFees {
@@ -1837,7 +1839,7 @@ fn test_always_create_tlv_format_onion_payloads() {
 	let cur_height = nodes[0].best_block_info().1 + 1;
 	let recipient_fields = RecipientOnionFields::spontaneous_empty();
 	let path = &route.paths[0];
-	let (onion_payloads, _htlc_msat, _htlc_cltv) =
+	let (onion_payloads, _htlc_msat, _htlc_cltv, _) =
 		build_onion_payloads(path, 40000, &recipient_fields, cur_height, &None, None, None)
 			.unwrap();
 
@@ -1900,7 +1902,7 @@ fn test_trampoline_onion_payload_assembly_values() {
 	let path = Path {
 		hops: vec![
 			// Bob
-			RouteHop {
+			RouteHop { payment_amount: amt_msat, rgb_payment: None,
 				pubkey: PublicKey::from_slice(&<Vec<u8>>::from_hex(BOB_HEX).unwrap()).unwrap(),
 				node_features: NodeFeatures::empty(),
 				short_channel_id: 0,
@@ -1910,7 +1912,7 @@ fn test_trampoline_onion_payload_assembly_values() {
 				maybe_announced_channel: false,
 			},
 			// Carol
-			RouteHop {
+			RouteHop { payment_amount: amt_msat, rgb_payment: None,
 				pubkey: PublicKey::from_slice(&<Vec<u8>>::from_hex(CAROL_HEX).unwrap()).unwrap(),
 				node_features: NodeFeatures::empty(),
 				short_channel_id: (572330 << 40) + (42 << 16) + 2821,
@@ -2036,7 +2038,7 @@ fn test_trampoline_onion_payload_assembly_values() {
 	)
 	.unwrap();
 
-	let (outer_payloads, total_msat, total_htlc_offset) = build_onion_payloads(
+	let (outer_payloads, total_msat, total_htlc_offset, _) = build_onion_payloads(
 		&path,
 		outer_total_msat,
 		&recipient_onion_fields,
@@ -2070,7 +2072,7 @@ fn test_trampoline_onion_payload_assembly_values() {
 		panic!("Bob payload must be Forward");
 	}
 
-	let (_, total_msat_combined, total_htlc_offset_combined) = onion_utils::create_payment_onion(
+	let (_, total_msat_combined, total_htlc_offset_combined, _) = onion_utils::create_payment_onion(
 		&Secp256k1::new(),
 		&path,
 		&session_priv,
@@ -2195,7 +2197,7 @@ fn test_trampoline_onion_payload_construction_vectors() {
 
 	let outer_payloads = vec![
 		// Bob
-		OutboundOnionPayload::Forward {
+		OutboundOnionPayload::Forward { rgb_payment_to_forward: None,
 			short_channel_id: (572330 << 40) + (42 << 16) + 2821,
 			amt_to_forward: 150153000,
 			outgoing_cltv_value: 800060,
@@ -2219,7 +2221,7 @@ fn test_trampoline_onion_payload_construction_vectors() {
 	let outer_hops = Path {
 		hops: vec![
 			// Bob
-			RouteHop {
+			RouteHop { payment_amount: 0, rgb_payment: None,
 				pubkey: PublicKey::from_slice(&<Vec<u8>>::from_hex(BOB_HEX).unwrap()).unwrap(),
 				node_features: NodeFeatures::empty(),
 				short_channel_id: 0,
@@ -2229,7 +2231,7 @@ fn test_trampoline_onion_payload_construction_vectors() {
 				maybe_announced_channel: false,
 			},
 			// Carol
-			RouteHop {
+			RouteHop { payment_amount: 0, rgb_payment: None,
 				pubkey: PublicKey::from_slice(&<Vec<u8>>::from_hex(CAROL_HEX).unwrap()).unwrap(),
 				node_features: NodeFeatures::empty(),
 				short_channel_id: 0,
@@ -2370,7 +2372,7 @@ macro_rules! get_phantom_route {
 			.with_bolt11_features($nodes[1].node.bolt11_invoice_features())
 			.unwrap()
 			.with_route_hints(vec![RouteHint(vec![
-				RouteHintHop {
+				RouteHintHop { htlc_maximum_rgb: None,
 					src_node_id: $nodes[0].node.get_our_node_id(),
 					short_channel_id: $channel.0.contents.short_channel_id,
 					fees: RoutingFees {
@@ -2381,7 +2383,7 @@ macro_rules! get_phantom_route {
 					htlc_minimum_msat: None,
 					htlc_maximum_msat: None,
 				},
-				RouteHintHop {
+				RouteHintHop { htlc_maximum_rgb: None,
 					src_node_id: phantom_route_hint.real_node_pubkey,
 					short_channel_id: phantom_route_hint.phantom_scid,
 					fees: RoutingFees { base_msat: 0, proportional_millionths: 0 },
@@ -2394,7 +2396,7 @@ macro_rules! get_phantom_route {
 		let scorer = test_utils::TestScorer::new();
 		let first_hops = $nodes[0].node.list_usable_channels();
 		let network_graph = $nodes[0].network_graph.read_only();
-		let route_params = RouteParameters::from_payment_params_and_value(payment_params, $amt);
+		let route_params = RouteParameters::from_payment_params_and_value(payment_params, $amt, None);
 		(
 			get_route(
 				&$nodes[0].node.get_our_node_id(),
@@ -2533,7 +2535,7 @@ fn test_phantom_invalid_onion_payload() {
 					let mut onion_keys =
 						construct_onion_keys(&Secp256k1::new(), &route.paths[0], &session_priv);
 					let recipient_onion_fields = RecipientOnionFields::secret_only(payment_secret);
-					let (mut onion_payloads, _, _) = build_onion_payloads(
+					let (mut onion_payloads, _, _, _) = build_onion_payloads(
 						&route.paths[0],
 						msgs::MAX_VALUE_MSAT + 1,
 						&recipient_onion_fields,

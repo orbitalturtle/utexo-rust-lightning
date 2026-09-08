@@ -10,7 +10,6 @@
 //! A bunch of useful utilities for building networks of nodes and exchanging messages between
 //! nodes for functional tests.
 
-/*
 use crate::chain::channelmonitor::ChannelMonitor;
 use crate::chain::transaction::OutPoint;
 use crate::chain::{BestBlock, ChannelMonitorUpdateStatus, Confirm, Listen, Watch};
@@ -890,7 +889,7 @@ impl<'a, 'b, 'c> Drop for Node<'a, 'b, 'c> {
 					>,
 				)>::read(
 					&mut io::Cursor::new(w.0),
-					ChannelManagerReadArgs {
+					ChannelManagerReadArgs { ldk_data_dir: std::path::PathBuf::new(),
 						config: self.node.get_current_config(),
 						entropy_source: self.keys_manager,
 						node_signer: self.keys_manager,
@@ -1350,7 +1349,7 @@ pub fn _reload_node<'a, 'b, 'c>(
 		}
 		<(BlockHash, TestChannelManager<'b, 'c>)>::read(
 			&mut node_read,
-			ChannelManagerReadArgs {
+			ChannelManagerReadArgs { ldk_data_dir: std::path::PathBuf::new(),
 				config,
 				entropy_source: node.keys_manager,
 				node_signer: node.keys_manager,
@@ -1595,7 +1594,7 @@ pub fn exchange_open_accept_zero_conf_chan<'a, 'b, 'c, 'd>(
 
 	initiator
 		.node
-		.create_channel(receiver_node_id, channel_value_sat, push_msat, 42, None, initiator_config)
+		.create_channel(receiver_node_id, channel_value_sat, push_msat, 42, None, initiator_config, None)
 		.unwrap();
 	let open_channel =
 		get_event_msg!(initiator, MessageSendEvent::SendOpenChannel, receiver_node_id);
@@ -1711,7 +1710,7 @@ pub fn exchange_open_accept_chan<'a, 'b, 'c>(
 	let node_b_id = node_b.node.get_our_node_id();
 
 	let create_chan_id =
-		node_a.node.create_channel(node_b_id, channel_value, push_msat, 42, None, None).unwrap();
+		node_a.node.create_channel(node_b_id, channel_value, push_msat, 42, None, None, None).unwrap();
 	let open_channel_msg = get_event_msg!(node_a, MessageSendEvent::SendOpenChannel, node_b_id);
 	assert_eq!(open_channel_msg.common_fields.temporary_channel_id, create_chan_id);
 	assert_eq!(
@@ -2013,7 +2012,7 @@ pub fn create_unannounced_chan_between_nodes_with_value<'a, 'b, 'c, 'd>(
 	no_announce_cfg.channel_handshake_config.announce_for_forwarding = false;
 	nodes[a]
 		.node
-		.create_channel(node_b_id, channel_value, push_msat, 42, None, Some(no_announce_cfg))
+		.create_channel(node_b_id, channel_value, push_msat, 42, None, Some(no_announce_cfg), None)
 		.unwrap();
 	let open_channel = get_event_msg!(nodes[a], MessageSendEvent::SendOpenChannel, node_b_id);
 	nodes[b].node.handle_open_channel(node_a_id, &open_channel);
@@ -2902,7 +2901,7 @@ macro_rules! get_route {
 		let route_params = $crate::routing::router::RouteParameters::from_payment_params_and_value(
 			$payment_params,
 			$recv_value,
-		);
+		None,);
 		$crate::ln::functional_test_utils::get_route(&$send_node, &route_params)
 	}};
 }
@@ -2932,7 +2931,7 @@ macro_rules! get_route_and_payment_hash {
 			$crate::routing::router::RouteParameters::from_payment_params_and_value(
 				$payment_params,
 				$recv_value,
-			);
+			None,);
 		route_params.max_total_routing_fee_msat = $max_total_routing_fee_msat;
 		let (payment_preimage, payment_hash, payment_secret) =
 			$crate::ln::functional_test_utils::get_payment_preimage_hash(
@@ -4166,7 +4165,7 @@ pub fn route_payment<'a, 'b, 'c>(
 	)
 	.with_bolt11_features(expected_route.last().unwrap().node.bolt11_invoice_features())
 	.unwrap();
-	let route_params = RouteParameters::from_payment_params_and_value(payment_params, recv_value);
+	let route_params = RouteParameters::from_payment_params_and_value(payment_params, recv_value, None);
 	let route = get_route(origin_node, &route_params).unwrap();
 	assert_eq!(route.paths.len(), 1);
 	assert_eq!(route.paths[0].hops.len(), expected_route.len());
@@ -4601,7 +4600,7 @@ pub fn create_node_chanmgrs<'a, 'b>(
 			},
 			params,
 			genesis_block.header.time,
-		);
+		std::path::PathBuf::new(),);
 		chanmgrs.push(node);
 	}
 
@@ -5550,7 +5549,7 @@ pub fn create_batch_channel_funding<'a, 'b, 'c>(
 				*user_channel_id,
 				None,
 				override_config.clone(),
-			)
+			None,)
 			.unwrap();
 		let open_channel_msg =
 			get_event_msg!(funding_node, MessageSendEvent::SendOpenChannel, other_node_id);
@@ -5617,4 +5616,3 @@ pub fn create_batch_channel_funding<'a, 'b, 'c>(
 	}
 	return (tx, funding_created_msgs);
 }
-*/

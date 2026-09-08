@@ -2976,7 +2976,7 @@ mod tests {
 		let logger = test_utils::TestLogger::new();
 		let logger_ref = &logger;
 		let log = WithContext::from(&logger_ref, None, None, Some(PaymentHash([0; 32])));
-		let outbound_payments = OutboundPayments::new(new_hash_map());
+		let outbound_payments = OutboundPayments::new(new_hash_map(), std::path::PathBuf::new());
 		let network_graph = Arc::new(NetworkGraph::new(Network::Testnet, &logger));
 		let scorer = RwLock::new(test_utils::TestScorer::new());
 		let router = test_utils::TestRouter::new(network_graph, &logger, &scorer);
@@ -2988,7 +2988,7 @@ mod tests {
 				PublicKey::from_secret_key(&secp_ctx, &SecretKey::from_slice(&[42; 32]).unwrap()),
 				0
 			).with_expiry_time(past_expiry_time);
-		let expired_route_params = RouteParameters::from_payment_params_and_value(payment_params, 0);
+		let expired_route_params = RouteParameters::from_payment_params_and_value(payment_params, 0, None);
 		let pending_events = Mutex::new(VecDeque::new());
 		if on_retry {
 			outbound_payments.add_new_pending_payment(PaymentHash([0; 32]), RecipientOnionFields::spontaneous_empty(),
@@ -3023,7 +3023,7 @@ mod tests {
 		let logger = test_utils::TestLogger::new();
 		let logger_ref = &logger;
 		let log = WithContext::from(&logger_ref, None, None, Some(PaymentHash([0; 32])));
-		let outbound_payments = OutboundPayments::new(new_hash_map());
+		let outbound_payments = OutboundPayments::new(new_hash_map(), std::path::PathBuf::new());
 		let network_graph = Arc::new(NetworkGraph::new(Network::Testnet, &logger));
 		let scorer = RwLock::new(test_utils::TestScorer::new());
 		let router = test_utils::TestRouter::new(network_graph, &logger, &scorer);
@@ -3032,7 +3032,7 @@ mod tests {
 
 		let payment_params = PaymentParameters::from_node_id(
 			PublicKey::from_secret_key(&secp_ctx, &SecretKey::from_slice(&[42; 32]).unwrap()), 0);
-		let route_params = RouteParameters::from_payment_params_and_value(payment_params, 0);
+		let route_params = RouteParameters::from_payment_params_and_value(payment_params, 0, None);
 		router.expect_find_route(route_params.clone(), Err(""));
 
 		let pending_events = Mutex::new(VecDeque::new());
@@ -3064,7 +3064,7 @@ mod tests {
 		let logger = test_utils::TestLogger::new();
 		let logger_ref = &logger;
 		let log = WithContext::from(&logger_ref, None, None, Some(PaymentHash([0; 32])));
-		let outbound_payments = OutboundPayments::new(new_hash_map());
+		let outbound_payments = OutboundPayments::new(new_hash_map(), std::path::PathBuf::new());
 		let network_graph = Arc::new(NetworkGraph::new(Network::Testnet, &logger));
 		let scorer = RwLock::new(test_utils::TestScorer::new());
 		let router = test_utils::TestRouter::new(network_graph, &logger, &scorer);
@@ -3074,10 +3074,10 @@ mod tests {
 		let sender_pk = PublicKey::from_secret_key(&secp_ctx, &SecretKey::from_slice(&[42; 32]).unwrap());
 		let receiver_pk = PublicKey::from_secret_key(&secp_ctx, &SecretKey::from_slice(&[43; 32]).unwrap());
 		let payment_params = PaymentParameters::from_node_id(sender_pk, 0);
-		let route_params = RouteParameters::from_payment_params_and_value(payment_params.clone(), 0);
+		let route_params = RouteParameters::from_payment_params_and_value(payment_params.clone(), 0, None);
 		let failed_scid = 42;
 		let route = Route {
-			paths: vec![Path { hops: vec![RouteHop {
+			paths: vec![Path { hops: vec![RouteHop { payment_amount: 0, rgb_payment: None,
 				pubkey: receiver_pk,
 				node_features: NodeFeatures::empty(),
 				short_channel_id: failed_scid,
@@ -3146,7 +3146,7 @@ mod tests {
 	#[rustfmt::skip]
 	fn removes_stale_awaiting_invoice_using_absolute_timeout() {
 		let pending_events = Mutex::new(VecDeque::new());
-		let outbound_payments = OutboundPayments::new(new_hash_map());
+		let outbound_payments = OutboundPayments::new(new_hash_map(), std::path::PathBuf::new());
 		let payment_id = PaymentId([0; 32]);
 		let absolute_expiry = 100;
 		let tick_interval = 10;
@@ -3201,7 +3201,7 @@ mod tests {
 	#[rustfmt::skip]
 	fn removes_stale_awaiting_invoice_using_timer_ticks() {
 		let pending_events = Mutex::new(VecDeque::new());
-		let outbound_payments = OutboundPayments::new(new_hash_map());
+		let outbound_payments = OutboundPayments::new(new_hash_map(), std::path::PathBuf::new());
 		let payment_id = PaymentId([0; 32]);
 		let timer_ticks = 3;
 		let expiration = StaleExpiration::TimerTicks(timer_ticks);
@@ -3255,7 +3255,7 @@ mod tests {
 	#[rustfmt::skip]
 	fn removes_abandoned_awaiting_invoice() {
 		let pending_events = Mutex::new(VecDeque::new());
-		let outbound_payments = OutboundPayments::new(new_hash_map());
+		let outbound_payments = OutboundPayments::new(new_hash_map(), std::path::PathBuf::new());
 		let payment_id = PaymentId([0; 32]);
 		let expiration = StaleExpiration::AbsoluteTimeout(Duration::from_secs(100));
 
@@ -3297,7 +3297,7 @@ mod tests {
 		let nonce = Nonce([0; 16]);
 
 		let pending_events = Mutex::new(VecDeque::new());
-		let outbound_payments = OutboundPayments::new(new_hash_map());
+		let outbound_payments = OutboundPayments::new(new_hash_map(), std::path::PathBuf::new());
 		let payment_id = PaymentId([0; 32]);
 		let expiration = StaleExpiration::AbsoluteTimeout(Duration::from_secs(100));
 
@@ -3352,7 +3352,7 @@ mod tests {
 		let keys_manager = test_utils::TestKeysInterface::new(&[0; 32], Network::Testnet);
 
 		let pending_events = Mutex::new(VecDeque::new());
-		let outbound_payments = OutboundPayments::new(new_hash_map());
+		let outbound_payments = OutboundPayments::new(new_hash_map(), std::path::PathBuf::new());
 		let expanded_key = ExpandedKey::new([42; 32]);
 		let nonce = Nonce([0; 16]);
 		let payment_id = PaymentId([0; 32]);
@@ -3380,7 +3380,7 @@ mod tests {
 		let route_params = RouteParameters::from_payment_params_and_value(
 			PaymentParameters::from_bolt12_invoice(&invoice),
 			invoice.amount_msats(),
-		);
+		None);
 		router.expect_find_route(route_params, Err(""));
 
 		assert_eq!(
@@ -3417,7 +3417,7 @@ mod tests {
 		let keys_manager = test_utils::TestKeysInterface::new(&[0; 32], Network::Testnet);
 
 		let pending_events = Mutex::new(VecDeque::new());
-		let outbound_payments = OutboundPayments::new(new_hash_map());
+		let outbound_payments = OutboundPayments::new(new_hash_map(), std::path::PathBuf::new());
 		let expanded_key = ExpandedKey::new([42; 32]);
 		let nonce = Nonce([0; 16]);
 		let payment_id = PaymentId([0; 32]);
@@ -3432,7 +3432,7 @@ mod tests {
 			.build().unwrap()
 			.sign(recipient_sign).unwrap();
 
-		let route_params = RouteParameters {
+		let route_params = RouteParameters { rgb_payment: None,
 			payment_params: PaymentParameters::from_bolt12_invoice(&invoice),
 			final_value_msat: invoice.amount_msats(),
 			max_total_routing_fee_msat: Some(1234),
@@ -3443,7 +3443,7 @@ mod tests {
 				paths: vec![
 					Path {
 						hops: vec![
-							RouteHop {
+							RouteHop { payment_amount: 0, rgb_payment: None,
 								pubkey: recipient_pubkey(),
 								node_features: NodeFeatures::empty(),
 								short_channel_id: 42,
@@ -3525,14 +3525,14 @@ mod tests {
 	#[rustfmt::skip]
 	fn time_out_unreleased_async_payments() {
 		let pending_events = Mutex::new(VecDeque::new());
-		let outbound_payments = OutboundPayments::new(new_hash_map());
+		let outbound_payments = OutboundPayments::new(new_hash_map(), std::path::PathBuf::new());
 		let payment_id = PaymentId([0; 32]);
 		let absolute_expiry = 60;
 
 		let mut outbounds = outbound_payments.pending_outbound_payments.lock().unwrap();
 		let payment_params = PaymentParameters::from_node_id(test_utils::pubkey(42), 0)
 			.with_expiry_time(absolute_expiry);
-		let route_params = RouteParameters {
+		let route_params = RouteParameters { rgb_payment: None,
 			payment_params,
 			final_value_msat: 0,
 			max_total_routing_fee_msat: None,
@@ -3575,14 +3575,14 @@ mod tests {
 	#[rustfmt::skip]
 	fn abandon_unreleased_async_payment() {
 		let pending_events = Mutex::new(VecDeque::new());
-		let outbound_payments = OutboundPayments::new(new_hash_map());
+		let outbound_payments = OutboundPayments::new(new_hash_map(), std::path::PathBuf::new());
 		let payment_id = PaymentId([0; 32]);
 		let absolute_expiry = 60;
 
 		let mut outbounds = outbound_payments.pending_outbound_payments.lock().unwrap();
 		let payment_params = PaymentParameters::from_node_id(test_utils::pubkey(42), 0)
 			.with_expiry_time(absolute_expiry);
-		let route_params = RouteParameters {
+		let route_params = RouteParameters { rgb_payment: None,
 			payment_params,
 			final_value_msat: 0,
 			max_total_routing_fee_msat: None,

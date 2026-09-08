@@ -1838,7 +1838,7 @@ mod tests {
 				let dumb_scalar = SecretKey::from_slice(&<Vec<u8>>::from_hex("0101010101010101010101010101010101010101010101010101010101010101").unwrap()[..]).unwrap();
 				let dumb_point = PublicKey::from_secret_key(&secp_ctx, &dumb_scalar);
 				let hash = PaymentHash([1; 32]);
-				let htlc = HTLCOutputInCommitment { offered: false, amount_msat: 1_000_000, cltv_expiry: 0, payment_hash: hash, transaction_output_index: None };
+				let htlc = HTLCOutputInCommitment { rgb_payment: None, offered: false, amount_msat: 1_000_000, cltv_expiry: 0, payment_hash: hash, transaction_output_index: None };
 				let mut channel_parameters = ChannelTransactionParameters::test_dummy(0);
 				channel_parameters.channel_type_features =
 					ChannelTypeFeatures::anchors_zero_htlc_fee_and_dependencies();
@@ -1857,7 +1857,7 @@ mod tests {
 				let dumb_scalar = SecretKey::from_slice(&<Vec<u8>>::from_hex("0101010101010101010101010101010101010101010101010101010101010101").unwrap()[..]).unwrap();
 				let dumb_point = PublicKey::from_secret_key(&secp_ctx, &dumb_scalar);
 				let hash = PaymentHash([1; 32]);
-				let htlc = HTLCOutputInCommitment { offered: true, amount_msat: $amt, cltv_expiry: $expiry, payment_hash: hash, transaction_output_index: None };
+				let htlc = HTLCOutputInCommitment { rgb_payment: None, offered: true, amount_msat: $amt, cltv_expiry: $expiry, payment_hash: hash, transaction_output_index: None };
 				let mut channel_parameters = ChannelTransactionParameters::test_dummy(0);
 				channel_parameters.channel_type_features = $features;
 				PackageSolvingData::CounterpartyReceivedHTLCOutput(
@@ -1876,7 +1876,7 @@ mod tests {
 				let dumb_point = PublicKey::from_secret_key(&secp_ctx, &dumb_scalar);
 				let hash = PaymentHash([1; 32]);
 				let preimage = PaymentPreimage([2;32]);
-				let htlc = HTLCOutputInCommitment { offered: false, amount_msat: $amt, cltv_expiry: 0, payment_hash: hash, transaction_output_index: None };
+				let htlc = HTLCOutputInCommitment { rgb_payment: None, offered: false, amount_msat: $amt, cltv_expiry: 0, payment_hash: hash, transaction_output_index: None };
 				let mut channel_parameters = ChannelTransactionParameters::test_dummy(0);
 				channel_parameters.channel_type_features = $features;
 				PackageSolvingData::CounterpartyOfferedHTLCOutput(
@@ -1893,7 +1893,7 @@ mod tests {
 				let mut channel_parameters = ChannelTransactionParameters::test_dummy(0);
 				channel_parameters.channel_type_features = $features;
 				let preimage = PaymentPreimage([2;32]);
-				let htlc = HTLCOutputInCommitment {
+				let htlc = HTLCOutputInCommitment { rgb_payment: None,
 					offered: false,
 					amount_msat: 1337000,
 					cltv_expiry: 420,
@@ -1930,7 +1930,7 @@ mod tests {
 			{
 				let mut channel_parameters = ChannelTransactionParameters::test_dummy(0);
 				channel_parameters.channel_type_features = $features;
-				let htlc = HTLCOutputInCommitment {
+				let htlc = HTLCOutputInCommitment { rgb_payment: None,
 					offered: true,
 					amount_msat: 1337000,
 					cltv_expiry: $cltv_expiry,

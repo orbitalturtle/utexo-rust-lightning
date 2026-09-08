@@ -19,8 +19,8 @@ use crate::events::{
 };
 use crate::ln::blinded_payment_tests::{fail_blinded_htlc_backwards, get_blinded_route_parameters};
 use crate::ln::channelmanager::{
-	Bolt12PaymentError, OptionalOfferPaymentParams, PaymentId, RecipientOnionFields,
-	MIN_CLTV_EXPIRY_DELTA,
+	Bolt12PaymentError, NextHopForward, OptionalOfferPaymentParams, PaymentId,
+	RecipientOnionFields, MIN_CLTV_EXPIRY_DELTA,
 };
 use crate::ln::functional_test_utils::*;
 use crate::ln::inbound_payment;
@@ -3248,9 +3248,10 @@ fn intercepted_hold_htlc() {
 	lsp.node
 		.forward_intercepted_htlc(
 			intercept_id,
-			&chan_id,
+			NextHopForward::ChannelId(recipient.node.get_our_node_id(), &chan_id),
 			recipient.node.get_our_node_id(),
 			outbound_amt,
+			None,
 		)
 		.unwrap();
 	lsp.node.process_pending_htlc_forwards();
