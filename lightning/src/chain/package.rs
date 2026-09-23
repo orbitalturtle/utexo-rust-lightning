@@ -38,6 +38,7 @@ use crate::ln::channel_keys::{DelayedPaymentBasepoint, HtlcBasepoint};
 use crate::ln::channelmanager::MIN_CLTV_EXPIRY_DELTA;
 use crate::ln::msgs::DecodeError;
 use crate::sign::ecdsa::EcdsaChannelSigner;
+use rgb_lib::ContractId;
 use crate::sign::{ChannelDerivationParameters, HTLCDescriptor};
 use crate::types::features::ChannelTypeFeatures;
 use crate::types::payment::PaymentPreimage;
@@ -145,6 +146,10 @@ pub(crate) struct RevokedOutput {
 	channel_parameters: Option<ChannelTransactionParameters>,
 	// Added in LDK 0.1.4/0.2 and always set since.
 	outpoint_confirmation_height: Option<u32>,
+	// The RGB value locked in this specific revoked output, if this is a colored channel and
+	// coloring info was recorded for the commitment transaction this output belongs to. `None`
+	// for a vanilla channel, or if that record is unavailable (e.g. pre-dates this field).
+	rgb_payment: Option<(ContractId, u64)>,
 }
 
 impl RevokedOutput {
@@ -152,7 +157,7 @@ impl RevokedOutput {
 	pub(crate) fn build(
 		per_commitment_point: PublicKey, per_commitment_key: SecretKey, amount: Amount,
 		channel_parameters: ChannelTransactionParameters,
-		outpoint_confirmation_height: u32,
+		outpoint_confirmation_height: u32, rgb_payment: Option<(ContractId, u64)>,
 	) -> Self {
 		let directed_params = channel_parameters.as_counterparty_broadcastable();
 		let counterparty_keys = directed_params.broadcaster_pubkeys();
@@ -169,6 +174,7 @@ impl RevokedOutput {
 			on_counterparty_tx_csv,
 			channel_parameters: Some(channel_parameters),
 			outpoint_confirmation_height: Some(outpoint_confirmation_height),
+			rgb_payment,
 		}
 	}
 }
@@ -186,6 +192,7 @@ impl_writeable_tlv_based!(RevokedOutput, {
 	// aggregate `RevokedOutput` claims, which is the more conservative stance.
 	(14, is_counterparty_balance_on_anchors, (legacy, (), |_| Some(()))),
 	(15, channel_parameters, (option: ReadableArgs, None)), // Added in 0.2.
+	(17, rgb_payment, option),
 });
 
 /// A struct to describe a revoked offered output and corresponding information to generate a
@@ -763,6 +770,19 @@ impl PackageSolvingData {
 			}
 		};
 		amt
+	}
+	/// The RGB value locked in this specific solving input, if this is a colored (RGB) channel
+	/// and it was recorded for this input's commitment transaction. Only ever `Some` for the
+	/// revoked-output variants: an ordinary (non-revoked) counterparty or holder HTLC claim
+	/// carries its own RGB coloring via `color_htlc`, negotiated ahead of time with the
+	/// counterparty, so it never needs to go through a unilaterally-built justice transaction.
+	#[rustfmt::skip]
+	fn rgb_payment(&self) -> Option<(ContractId, u64)> {
+		match self {
+			PackageSolvingData::RevokedOutput(ref outp) => outp.rgb_payment,
+			PackageSolvingData::RevokedHTLCOutput(ref outp) => outp.htlc.rgb_payment,
+			_ => None,
+		}
 	}
 	#[rustfmt::skip]
 	fn weight(&self) -> usize {
@@ -1358,16 +1378,23 @@ impl PackageTemplate {
 	pub(crate) fn package_weight(&self, destination_script: &Script) -> u64 {
 		let mut inputs_weight = 0;
 		let mut witnesses_weight = 2; // count segwit flags
+		let mut any_rgb_payment = false;
 		for (_, outp) in self.inputs.iter() {
 			// previous_out_point: 36 bytes ; var_int: 1 byte ; sequence: 4 bytes
 			inputs_weight += 41 * WITNESS_SCALE_FACTOR;
 			witnesses_weight += outp.weight();
+			any_rgb_payment |= outp.rgb_payment().is_some();
 		}
 		// version: 4 bytes ; count_tx_in: 1 byte ; count_tx_out: 1 byte ; lock_time: 4 bytes
 		let transaction_weight = 10 * WITNESS_SCALE_FACTOR;
 		// value: 8 bytes ; var_int: 1 byte ; pk_script: `destination_script.len()`
 		let output_weight = (8 + 1 + destination_script.len()) * WITNESS_SCALE_FACTOR;
-		(inputs_weight + witnesses_weight + transaction_weight + output_weight) as u64
+		// If any swept input carries a known RGB value, the RGB colorer will append an RGB
+		// commitment output (best-effort - it may still end up not coloring at all, in which
+		// case this slightly overestimates weight, which is safe for a feerate target).
+		// value: 8 bytes ; var_int: 1 byte ; OP_RETURN(1) + pushdata_len(1) + 32-byte commitment.
+		let rgb_opret_weight = if any_rgb_payment { (8 + 1 + 1 + 1 + 32) * WITNESS_SCALE_FACTOR } else { 0 };
+		(inputs_weight + witnesses_weight + transaction_weight + output_weight + rgb_opret_weight) as u64
 	}
 	#[rustfmt::skip]
 	pub(crate) fn construct_malleable_package_with_external_funding<Signer: EcdsaChannelSigner>(
@@ -1408,6 +1435,34 @@ impl PackageTemplate {
 		};
 		for (outpoint, outp) in self.inputs.iter() {
 			bumped_tx.input.push(outp.as_tx_input(*outpoint));
+		}
+		// Before signing (which fixes the output set via SIGHASH_ALL), give the RGB colorer a
+		// chance to recognize and reclaim any RGB value locked in the revoked output(s) this
+		// transaction sweeps -- otherwise it's simply destroyed once this (uncolored) transaction
+		// confirms, since RGB value can only ever move via a transaction that explicitly carries
+		// it forward.
+		let mut rgb_contract_id = None;
+		let mut rgb_total_amount: u64 = 0;
+		let mut rgb_mismatch = false;
+		for (_, outp) in self.inputs.iter() {
+			if let Some((contract_id, amount)) = outp.rgb_payment() {
+				match rgb_contract_id {
+					None => rgb_contract_id = Some(contract_id),
+					Some(id) if id != contract_id => rgb_mismatch = true,
+					_ => {},
+				}
+				rgb_total_amount = rgb_total_amount.saturating_add(amount);
+			}
+		}
+		if rgb_mismatch {
+			log_debug!(logger, "Justice transaction sweeps revoked outputs from more than one RGB \
+				contract at once; skipping RGB recovery for this claim (BTC recovery is unaffected)");
+		} else if let Some(contract_id) = rgb_contract_id {
+			if rgb_total_amount > 0 {
+				if let Some(colorer) = onchain_handler.rgb_colorer.as_ref() {
+					colorer.color_justice_claim(&mut bumped_tx, (contract_id, rgb_total_amount));
+				}
+			}
 		}
 		for (i, (outpoint, out)) in self.inputs.iter().enumerate() {
 			log_debug!(logger, "Adding claiming input for outpoint {}:{}", outpoint.txid, outpoint.vout);

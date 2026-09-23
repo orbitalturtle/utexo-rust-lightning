@@ -32,6 +32,7 @@ use crate::chain::chainmonitor::Persist;
 use crate::chain::channelmonitor::{ChannelMonitor, ChannelMonitorUpdate};
 use crate::chain::transaction::OutPoint;
 use crate::ln::types::ChannelId;
+use crate::rgb_utils::RgbJusticeColorer;
 use crate::sign::{ecdsa::EcdsaChannelSigner, EntropySource, SignerProvider};
 use crate::sync::Mutex;
 use crate::util::async_poll::{dummy_waker, AsyncResult, MaybeSend, MaybeSync};
@@ -435,8 +436,16 @@ impl<ChannelSigner: EcdsaChannelSigner, K: KVStoreSync + ?Sized> Persist<Channel
 }
 
 /// Read previously persisted [`ChannelMonitor`]s from the store.
+///
+/// `rgb_colorer`, if supplied, is passed through to each restored monitor so its on-chain claim
+/// code can recover RGB value from a BOLT #5 justice transaction (see [`RgbJusticeColorer`]).
+/// It is never persisted as part of the monitor's own bytes -- see
+/// [`DefaultRgbJusticeColorer`]'s doc comment for why that matters.
+///
+/// [`DefaultRgbJusticeColorer`]: crate::rgb_utils::DefaultRgbJusticeColorer
 pub fn read_channel_monitors<K: Deref, ES: Deref, SP: Deref>(
 	kv_store: K, entropy_source: ES, signer_provider: SP,
+	rgb_colorer: Option<Arc<dyn RgbJusticeColorer + Send + Sync>>,
 ) -> Result<Vec<(BlockHash, ChannelMonitor<<SP::Target as SignerProvider>::EcdsaSigner>)>, io::Error>
 where
 	K::Target: KVStoreSync,
@@ -455,7 +464,7 @@ where
 				CHANNEL_MONITOR_PERSISTENCE_SECONDARY_NAMESPACE,
 				&stored_key,
 			)?),
-			(&*entropy_source, &*signer_provider),
+			(&*entropy_source, &*signer_provider, rgb_colorer.clone()),
 		) {
 			Ok(Some((block_hash, channel_monitor))) => {
 				let monitor_name = MonitorName::from_str(&stored_key)?;
@@ -625,9 +634,11 @@ where
 	/// Note that you can disable the update-writing entirely by setting `maximum_pending_updates`
 	/// to zero, causing this [`Persist`] implementation to behave like the blanket [`Persist`]
 	/// implementation for all [`KVStoreSync`]s.
+	#[allow(clippy::too_many_arguments)]
 	pub fn new(
 		kv_store: K, logger: L, maximum_pending_updates: u64, entropy_source: ES,
 		signer_provider: SP, broadcaster: BI, fee_estimator: FE,
+		rgb_colorer: Option<Arc<dyn RgbJusticeColorer + Send + Sync>>,
 	) -> Self {
 		// Note that calling the spawner only happens in the `pub(crate)` `spawn_*` methods defined
 		// with additional bounds on `MonitorUpdatingPersisterAsync`. Thus its safe to provide a
@@ -641,6 +652,7 @@ where
 			signer_provider,
 			broadcaster,
 			fee_estimator,
+			rgb_colorer,
 		))
 	}
 
@@ -823,6 +835,7 @@ struct MonitorUpdatingPersisterAsyncInner<
 	signer_provider: SP,
 	broadcaster: BI,
 	fee_estimator: FE,
+	rgb_colorer: Option<Arc<dyn RgbJusticeColorer + Send + Sync>>,
 }
 
 impl<K: Deref, S: FutureSpawner, L: Deref, ES: Deref, SP: Deref, BI: Deref, FE: Deref>
@@ -837,10 +850,16 @@ where
 {
 	/// Constructs a new [`MonitorUpdatingPersisterAsync`].
 	///
+	/// `rgb_colorer`, if supplied, is passed through to each restored monitor (see
+	/// [`read_channel_monitors`] for details); it is never persisted as part of a monitor's own
+	/// bytes.
+	///
 	/// See [`MonitorUpdatingPersister::new`] for more info.
+	#[allow(clippy::too_many_arguments)]
 	pub fn new(
 		kv_store: K, future_spawner: S, logger: L, maximum_pending_updates: u64,
 		entropy_source: ES, signer_provider: SP, broadcaster: BI, fee_estimator: FE,
+		rgb_colorer: Option<Arc<dyn RgbJusticeColorer + Send + Sync>>,
 	) -> Self {
 		MonitorUpdatingPersisterAsync(Arc::new(MonitorUpdatingPersisterAsyncInner {
 			kv_store,
@@ -852,6 +871,7 @@ where
 			signer_provider,
 			broadcaster,
 			fee_estimator,
+			rgb_colorer,
 		}))
 	}
 
@@ -1096,7 +1116,7 @@ where
 		}
 		match <Option<(BlockHash, ChannelMonitor<<SP::Target as SignerProvider>::EcdsaSigner>)>>::read(
 			&mut monitor_cursor,
-			(&*self.entropy_source, &*self.signer_provider),
+			(&*self.entropy_source, &*self.signer_provider, self.rgb_colorer.clone()),
 		) {
 			Ok(None) => Ok(None),
 			Ok(Some((blockhash, channel_monitor))) => {

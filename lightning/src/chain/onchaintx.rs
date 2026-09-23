@@ -33,11 +33,13 @@ use crate::ln::chan_utils::{
 	HTLCOutputInCommitment, HolderCommitmentTransaction,
 };
 use crate::ln::msgs::DecodeError;
+use crate::rgb_utils::RgbJusticeColorer;
 use crate::sign::{ecdsa::EcdsaChannelSigner, EntropySource, HTLCDescriptor, SignerProvider};
 use crate::util::logger::Logger;
 use crate::util::ser::{
 	MaybeReadable, Readable, ReadableArgs, UpgradableRequired, Writeable, Writer,
 };
+use std::sync::Arc;
 
 use crate::io;
 use crate::prelude::*;
@@ -277,12 +279,17 @@ pub struct OnchainTxHandler<ChannelSigner: EcdsaChannelSigner> {
 	onchain_events_awaiting_threshold_conf: Vec<OnchainEventEntry>,
 
 	pub(super) secp_ctx: Secp256k1<secp256k1::All>,
+
+	// Not persisted: `ldk_data_dir` and the RGB KVStore are node-wide, not per-channel, state,
+	// so this is supplied fresh at every construction/restore rather than serialized into this
+	// handler's own bytes. See `DefaultRgbJusticeColorer`'s doc comment for why that matters.
+	pub(super) rgb_colorer: Option<Arc<dyn RgbJusticeColorer + Send + Sync>>,
 }
 
 impl<ChannelSigner: EcdsaChannelSigner> PartialEq for OnchainTxHandler<ChannelSigner> {
 	#[rustfmt::skip]
 	fn eq(&self, other: &Self) -> bool {
-		// `signer`, `secp_ctx`, and `pending_claim_events` are excluded on purpose.
+		// `signer`, `secp_ctx`, `pending_claim_events`, and `rgb_colorer` are excluded on purpose.
 		self.channel_value_satoshis == other.channel_value_satoshis &&
 			self.channel_keys_id == other.channel_keys_id &&
 			self.destination_script == other.destination_script &&
@@ -348,15 +355,17 @@ impl<ChannelSigner: EcdsaChannelSigner> OnchainTxHandler<ChannelSigner> {
 	}
 }
 
-impl<'a, 'b, ES: EntropySource, SP: SignerProvider> ReadableArgs<(&'a ES, &'b SP, u64, [u8; 32])>
+impl<'a, 'b, ES: EntropySource, SP: SignerProvider>
+	ReadableArgs<(&'a ES, &'b SP, u64, [u8; 32], Option<Arc<dyn RgbJusticeColorer + Send + Sync>>)>
 	for OnchainTxHandler<SP::EcdsaSigner>
 {
 	#[rustfmt::skip]
-	fn read<R: io::Read>(reader: &mut R, args: (&'a ES, &'b SP, u64, [u8; 32])) -> Result<Self, DecodeError> {
+	fn read<R: io::Read>(reader: &mut R, args: (&'a ES, &'b SP, u64, [u8; 32], Option<Arc<dyn RgbJusticeColorer + Send + Sync>>)) -> Result<Self, DecodeError> {
 		let entropy_source = args.0;
 		let signer_provider = args.1;
 		let channel_value_satoshis = args.2;
 		let channel_keys_id = args.3;
+		let rgb_colorer = args.4;
 
 		let _ver = read_ver_prefix!(reader, SERIALIZATION_VERSION);
 
@@ -438,15 +447,18 @@ impl<'a, 'b, ES: EntropySource, SP: SignerProvider> ReadableArgs<(&'a ES, &'b SP
 			onchain_events_awaiting_threshold_conf,
 			pending_claim_events: Vec::new(),
 			secp_ctx,
+			rgb_colorer,
 		})
 	}
 }
 
 impl<ChannelSigner: EcdsaChannelSigner> OnchainTxHandler<ChannelSigner> {
+	#[allow(clippy::too_many_arguments)]
 	pub(crate) fn new(
 		channel_value_satoshis: u64, channel_keys_id: [u8; 32], destination_script: ScriptBuf,
 		signer: ChannelSigner, channel_parameters: ChannelTransactionParameters,
 		holder_commitment: HolderCommitmentTransaction, secp_ctx: Secp256k1<secp256k1::All>,
+		rgb_colorer: Option<Arc<dyn RgbJusticeColorer + Send + Sync>>,
 	) -> Self {
 		OnchainTxHandler {
 			channel_value_satoshis,
@@ -462,6 +474,7 @@ impl<ChannelSigner: EcdsaChannelSigner> OnchainTxHandler<ChannelSigner> {
 			onchain_events_awaiting_threshold_conf: Vec::new(),
 			pending_claim_events: Vec::new(),
 			secp_ctx,
+			rgb_colorer,
 		}
 	}
 

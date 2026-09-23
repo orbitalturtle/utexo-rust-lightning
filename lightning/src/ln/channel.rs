@@ -3375,12 +3375,17 @@ where
 		let monitor_signer = signer_provider.derive_channel_signer(context.channel_keys_id);
 		// TODO(RBF): When implementing RBF, the funding_txo passed here must only update
 		// ChannelMonitorImp::first_confirmed_funding_txo during channel establishment, not splicing
+		let rgb_colorer: Option<std::sync::Arc<dyn crate::rgb_utils::RgbJusticeColorer + Send + Sync>> =
+			Some(std::sync::Arc::new(crate::rgb_utils::DefaultRgbJusticeColorer::new(
+				context.ldk_data_dir.clone(),
+				std::sync::Arc::clone(&context.rgb_kv_store),
+			)));
 		let channel_monitor = ChannelMonitor::new(
 			context.secp_ctx.clone(), monitor_signer, shutdown_script,
 			funding.get_holder_selected_contest_delay(), &context.destination_script,
 			&funding.channel_transaction_parameters, funding.is_outbound(), obscure_factor,
 			holder_commitment_tx, best_block, context.counterparty_node_id, context.channel_id(),
-			context.is_manual_broadcast,
+			context.is_manual_broadcast, rgb_colorer,
 		);
 		channel_monitor.provide_initial_counterparty_commitment_tx(
 			counterparty_initial_commitment_tx.clone(),

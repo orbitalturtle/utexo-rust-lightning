@@ -18,6 +18,7 @@ use crate::types::payment::PaymentHash;
 use crate::util::persist::KVStoreSync;
 
 use bitcoin::blockdata::transaction::Transaction;
+use bitcoin::hash_types::Txid;
 use bitcoin::hashes::{sha256, Hash};
 use bitcoin::hex::DisplayHex;
 use bitcoin::psbt::{ExtractTxError, Psbt};
@@ -668,6 +669,141 @@ pub(crate) fn color_closing(
 	Ok(())
 }
 
+/// Color a BOLT #5 justice/penalty transaction that sweeps one or more revoked outputs.
+///
+/// Unlike [`color_commitment`], [`color_htlc`] and [`color_closing`], this is never called for
+/// a transaction shape that was already negotiated (and thus already speculatively colored)
+/// with the counterparty ahead of time: a justice transaction is built unilaterally, on the fly,
+/// by the honest party alone once a breach is detected, with a feerate/output value chosen at
+/// broadcast time. There is nothing to negotiate: `contract_id` and `total_amount` describe the
+/// RGB value already known (from this same wallet's own history) to be locked in the revoked
+/// output(s) this transaction spends, and `output_map` says which of `tx`'s own outputs should
+/// receive that value (in practice, the single destination output the justice transaction pays
+/// its entire swept value to).
+///
+/// This is a best-effort operation by design: on any failure it returns an `Err` and leaves `tx`
+/// entirely unmodified, so the caller can safely fall back to broadcasting the plain, uncolored
+/// claim. An RGB coloring failure must never prevent recovering the underlying BTC penalty --
+/// that recovery is strictly more certain and, absent this function, is all that happens today.
+pub(crate) fn color_justice(
+	tx: &mut Transaction, contract_id: ContractId, output_map: HashMap<u32, u64>,
+	ldk_data_dir: &Path, kv_store: &dyn KVStoreSync,
+) -> Result<(), String> {
+	if output_map.values().all(|amt| *amt == 0) {
+		return Err("nothing to color".to_string());
+	}
+
+	// Unlike color_commitment/color_closing, this runs from chain-sync/claim-generation code
+	// rather than from message-processing, so we cannot assume a Tokio runtime is entered on
+	// this thread the way those call sites do. Fail closed instead of risking a panic here.
+	let handle = Handle::try_current().map_err(|e| format!("no Tokio runtime entered: {e}"))?;
+	let _ = handle.enter();
+
+	let asset_coloring_info =
+		AssetColoringInfo { output_map: output_map.clone(), static_blinding: Some(STATIC_BLINDING) };
+	let coloring_info = ColoringInfo {
+		asset_info_map: HashMap::from_iter([(contract_id, asset_coloring_info)]),
+		static_blinding: Some(STATIC_BLINDING),
+		nonce: None,
+	};
+
+	let psbt = Psbt::from_unsigned_tx(tx.clone()).map_err(|e| format!("{e:?}"))?;
+	let mut psbt = RgbLibPsbt::from_str(&psbt.to_string()).map_err(|e| format!("{e:?}"))?;
+	let wallet = futures::executor::block_on(_get_rgb_wallet(ldk_data_dir, kv_store));
+	let (fascia, _) =
+		wallet.color_psbt(&mut psbt, coloring_info).map_err(|e| format!("color_psbt: {e}"))?;
+	let psbt = Psbt::from_str(&psbt.to_string()).map_err(|e| format!("{e:?}"))?;
+	let modified_tx = match psbt.extract_tx() {
+		Ok(tx) => tx,
+		Err(ExtractTxError::MissingInputValue { tx }) => tx,
+		Err(e) => return Err(format!("extract_tx: {e:?}")),
+	};
+
+	let txid = modified_tx.compute_txid();
+	*tx = modified_tx;
+
+	wallet
+		.consume_fascia(fascia, Some(WitnessOrd::Ignored))
+		.map_err(|e| format!("consume_fascia: {e}"))?;
+
+	let transfer_info = TransferInfo { contract_id, output_map };
+	kv_store.write_rgb_transfer_info(&txid.to_string(), &transfer_info);
+
+	Ok(())
+}
+
+/// A pluggable capability, supplied at [`OnchainTxHandler`]/[`ChannelMonitor`] construction time
+/// (never persisted -- see the module-level design note above [`DefaultRgbJusticeColorer`]),
+/// letting on-chain claim code recover RGB value from a BOLT #5 justice transaction without
+/// depending on the channel signer for anything beyond signing.
+///
+/// [`OnchainTxHandler`]: crate::chain::onchaintx::OnchainTxHandler
+/// [`ChannelMonitor`]: crate::chain::channelmonitor::ChannelMonitor
+pub trait RgbJusticeColorer {
+	/// Returns the RGB coloring recorded for the commitment transaction identified by `txid`, if
+	/// this is a colored (RGB) channel and that transaction was colored (by either party's
+	/// version of some past commitment state) when it was originally built.
+	///
+	/// Needed to recover the RGB amount locked in a revoked (non-HTLC) output: unlike an HTLC's
+	/// RGB payment, which travels with the HTLC data itself, a commitment's plain
+	/// to_local/to_remote RGB split isn't otherwise available to on-chain claim code once a newer
+	/// state has superseded it.
+	fn get_rgb_transfer_info(&self, txid: &Txid) -> Option<TransferInfo>;
+	/// Best-effort: if `tx` (a justice transaction sweeping one or more revoked outputs, with its
+	/// final inputs already attached and destination output(s) already decided, but not yet
+	/// signed) spends any RGB-colored revoked output(s), embeds the RGB coloring commitment for
+	/// the honest party's claim into `tx` before it is signed.
+	///
+	/// `rgb_payment` is the aggregate `(contract_id, amount)` of RGB value expected to be locked
+	/// in the revoked output(s) this transaction spends, as recorded when those outputs'
+	/// commitment transaction was originally colored.
+	///
+	/// May mutate `tx` by appending an RGB commitment output (e.g. an `OP_RETURN`). Must leave
+	/// `tx` completely unmodified if it does not color it -- callers fall back to broadcasting
+	/// the plain, uncolored claim in that case, so a partial mutation here would silently corrupt
+	/// that fallback.
+	fn color_justice_claim(&self, tx: &mut Transaction, rgb_payment: (ContractId, u64));
+}
+
+/// The default, always-available [`RgbJusticeColorer`]: a thin handle onto the same
+/// `ldk_data_dir` + RGB `KVStoreSync` every other coloring function in this module already uses.
+///
+/// Supplied fresh at every [`OnchainTxHandler`]/[`ChannelMonitor`] construction or restore (via
+/// `ReadableArgs`), rather than persisted into the monitor's own serialized bytes: `ldk_data_dir`
+/// and the KVStore handle are node-wide, not per-channel, state, so there is nothing to migrate
+/// and no "commitments created before this landed stay uncolored" gap for already-existing
+/// channels the way a newly-added *persisted* field would have.
+///
+/// [`OnchainTxHandler`]: crate::chain::onchaintx::OnchainTxHandler
+/// [`ChannelMonitor`]: crate::chain::channelmonitor::ChannelMonitor
+pub struct DefaultRgbJusticeColorer {
+	ldk_data_dir: PathBuf,
+	kv_store: Arc<dyn KVStoreSync + Send + Sync>,
+}
+
+impl DefaultRgbJusticeColorer {
+	/// Builds a colorer backed by the given data directory and RGB KVStore.
+	pub fn new(ldk_data_dir: PathBuf, kv_store: Arc<dyn KVStoreSync + Send + Sync>) -> Self {
+		Self { ldk_data_dir, kv_store }
+	}
+}
+
+impl RgbJusticeColorer for DefaultRgbJusticeColorer {
+	fn get_rgb_transfer_info(&self, txid: &Txid) -> Option<TransferInfo> {
+		self.kv_store.read_rgb_transfer_info_checked(&txid.to_string())
+	}
+
+	fn color_justice_claim(&self, tx: &mut Transaction, rgb_payment: (ContractId, u64)) {
+		let (contract_id, amount) = rgb_payment;
+		// The entire swept value of a justice transaction always lands on its single
+		// destination output, at index 0 (see `PackageTemplate::maybe_finalize_malleable_package`).
+		let output_map = HashMap::from_iter([(0u32, amount)]);
+		let _ = color_justice(tx, contract_id, output_map, &self.ldk_data_dir, self.kv_store.as_ref());
+		// Best-effort: on error, `tx` is left untouched (see `color_justice`'s contract) and the
+		// caller broadcasts the plain, uncolored claim.
+	}
+}
+
 /// Get RgbInfo from KVStore
 pub(crate) fn get_rgb_channel_info(
 	channel_id: &str, pending: bool, kv_store: &dyn KVStoreSync,
@@ -884,6 +1020,12 @@ pub(crate) fn update_rgb_channel_amount_pending(
 pub trait RgbKvStoreExt {
 	/// read transfer info from KVStore
 	fn read_rgb_transfer_info(&self, txid: &str) -> TransferInfo;
+	/// read transfer info from KVStore, if any was ever recorded for this txid. Unlike
+	/// [`Self::read_rgb_transfer_info`], never panics on a missing or malformed record - a
+	/// vanilla (non-RGB) commitment, or a colored one whose coloring was never persisted (e.g.
+	/// pre-dating this method), simply has none. Safe to call from breach/on-chain-claim
+	/// handling, which must not panic on data it doesn't control the shape of.
+	fn read_rgb_transfer_info_checked(&self, txid: &str) -> Option<TransferInfo>;
 	/// write transfer info to KVStore
 	fn write_rgb_transfer_info(&self, txid: &str, info: &TransferInfo);
 	/// read channel info from KVStore
@@ -919,6 +1061,11 @@ impl<K: KVStoreSync + ?Sized> RgbKvStoreExt for K {
 		let data =
 			self.read(RGB_PRIMARY_NS, RGB_TRANSFER_INFO_NS, txid).expect("KVStore read failed");
 		bincode::deserialize(&data).expect("valid transfer info")
+	}
+
+	fn read_rgb_transfer_info_checked(&self, txid: &str) -> Option<TransferInfo> {
+		let data = self.read(RGB_PRIMARY_NS, RGB_TRANSFER_INFO_NS, txid).ok()?;
+		bincode::deserialize(&data).ok()
 	}
 
 	fn write_rgb_transfer_info(&self, txid: &str, info: &TransferInfo) {
