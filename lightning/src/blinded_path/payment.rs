@@ -101,7 +101,7 @@ impl BlindedPaymentPath {
 	{
 		// This value is not considered in pathfinding for 1-hop blinded paths, because it's intended to
 		// be in relation to a specific channel.
-		let htlc_maximum_msat = u64::max_value();
+		let htlc_maximum_msat = u64::MAX;
 		Self::new(
 			&[],
 			payee_node_id,
@@ -886,7 +886,7 @@ mod tests {
 					next_blinding_override: None,
 					features: BlindedHopFeatures::empty(),
 				},
-				htlc_maximum_msat: u64::max_value(),
+				htlc_maximum_msat: u64::MAX,
 			},
 			PaymentForwardNode {
 				node_id: dummy_pk,
@@ -904,7 +904,7 @@ mod tests {
 					next_blinding_override: None,
 					features: BlindedHopFeatures::empty(),
 				},
-				htlc_maximum_msat: u64::max_value(),
+				htlc_maximum_msat: u64::MAX,
 			},
 		];
 		let recv_tlvs = UnauthenticatedReceiveTlvs {
@@ -961,7 +961,7 @@ mod tests {
 					next_blinding_override: None,
 					features: BlindedHopFeatures::empty(),
 				},
-				htlc_maximum_msat: u64::max_value(),
+				htlc_maximum_msat: u64::MAX,
 			},
 			PaymentForwardNode {
 				node_id: dummy_pk,
@@ -979,7 +979,7 @@ mod tests {
 					next_blinding_override: None,
 					features: BlindedHopFeatures::empty(),
 				},
-				htlc_maximum_msat: u64::max_value(),
+				htlc_maximum_msat: u64::MAX,
 			},
 		];
 		let recv_tlvs = UnauthenticatedReceiveTlvs {
@@ -1020,7 +1020,7 @@ mod tests {
 					next_blinding_override: None,
 					features: BlindedHopFeatures::empty(),
 				},
-				htlc_maximum_msat: u64::max_value(),
+				htlc_maximum_msat: u64::MAX,
 			},
 			PaymentForwardNode {
 				node_id: dummy_pk,
@@ -1038,7 +1038,7 @@ mod tests {
 					next_blinding_override: None,
 					features: BlindedHopFeatures::empty(),
 				},
-				htlc_maximum_msat: u64::max_value(),
+				htlc_maximum_msat: u64::MAX,
 			},
 		];
 		let recv_tlvs = UnauthenticatedReceiveTlvs {
